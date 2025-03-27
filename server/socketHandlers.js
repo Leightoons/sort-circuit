@@ -1,5 +1,6 @@
 const { getModel, generateRoomCode } = require('./config/db');
 const { startRace, getRaceStatus, stopRace } = require('./controllers/race');
+const { getAllBetsForRoom, placeBet } = require('./controllers/bets');
 
 // Store active socket connections by user
 const activeConnections = new Map();
@@ -271,6 +272,16 @@ const registerSocketHandlers = (io) => {
               stepSpeed: room.stepSpeed
             }
           });
+          
+          // Send existing bets to the new user
+          const existingBets = getAllBetsForRoom(normalizedRoomCode);
+          for (const bet of existingBets) {
+            socket.emit('bet_placed', {
+              socketId: bet.socketId,
+              username: bet.username,
+              algorithm: bet.algorithm
+            });
+          }
         }
         
         console.log(`User ${socket.username} (${socket.id}) joined room ${normalizedRoomCode}`);
@@ -473,6 +484,9 @@ const registerSocketHandlers = (io) => {
           socket.emit('bet_error', { message: 'Cannot place bet after race has started' });
           return;
         }
+        
+        // Store the bet using the bets controller
+        placeBet(socket.id, socket.username, roomCode, algorithm);
         
         // Broadcast bet to all users in the room
         io.to(roomCode).emit('bet_placed', {
