@@ -233,9 +233,6 @@ const registerSocketHandlers = (io) => {
         // Notify players in the room
         io.to(normalizedRoomCode).emit('room_players', { players });
         
-        // Notify other users in the room about the new user
-        socket.to(normalizedRoomCode).emit('user_joined', player);
-        
         // Send current race status if race is in progress
         const raceStatus = getRaceStatus(normalizedRoomCode);
         if (raceStatus.exists) {

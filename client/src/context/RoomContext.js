@@ -52,11 +52,6 @@ export const RoomProvider = ({ children }) => {
       setError(message);
     });
 
-    // User joined room event
-    socket.on('user_joined', (user) => {
-      setPlayers((prevPlayers) => [...prevPlayers, user]);
-    });
-
     // User left room event
     socket.on('user_left', (user) => {
       setPlayers((prevPlayers) => 
@@ -168,7 +163,6 @@ export const RoomProvider = ({ children }) => {
       socket.off('room_created');
       socket.off('room_joined');
       socket.off('room_error');
-      socket.off('user_joined');
       socket.off('user_left');
       socket.off('room_players');
       socket.off('algorithms_updated');
