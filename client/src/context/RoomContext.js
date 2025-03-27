@@ -41,9 +41,12 @@ export const RoomProvider = ({ children }) => {
     });
 
     // Room joined event
-    socket.on('room_joined', ({ roomCode }) => {
+    socket.on('room_joined', ({ roomCode, isHost: isRoomHost }) => {
       setCurrentRoom(roomCode);
       setRoomStatus('waiting');
+      if (isRoomHost) {
+        setIsHost(true);
+      }
       setError(null);
     });
 
@@ -158,6 +161,20 @@ export const RoomProvider = ({ children }) => {
       }
     });
 
+    // Host assigned event
+    socket.on('host_assigned', ({ roomCode }) => {
+      console.log('User has been assigned as host');
+      setIsHost(true);
+    });
+
+    // Host changed event
+    socket.on('host_changed', ({ socketId, username }) => {
+      // Update host status if this user is the new host
+      if (socketId === socket.id) {
+        setIsHost(true);
+      }
+    });
+
     // Clean up listeners on unmount
     return () => {
       socket.off('room_created');
@@ -176,6 +193,8 @@ export const RoomProvider = ({ children }) => {
       socket.off('race_results');
       socket.off('race_error');
       socket.off('race_status');
+      socket.off('host_assigned');
+      socket.off('host_changed');
     };
   }, [socket, connected]);
 

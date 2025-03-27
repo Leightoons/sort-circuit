@@ -237,7 +237,10 @@ const registerSocketHandlers = (io) => {
         
         // Send room joined confirmation
         console.log(`[JOIN] Emitting room_joined event to client with room code: ${normalizedRoomCode}`);
-        socket.emit('room_joined', { roomCode: normalizedRoomCode });
+        socket.emit('room_joined', { 
+          roomCode: normalizedRoomCode,
+          isHost: room.host === socket.id
+        });
         
         // Get all players currently in the socket room
         const socketsInRoom = await io.in(normalizedRoomCode).fetchSockets();
