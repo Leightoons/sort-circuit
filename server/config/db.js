@@ -3,6 +3,9 @@ const db = {
   rooms: new Map()
 };
 
+// For debug purposes
+global.getInMemoryDB = () => db;
+
 // Generate a random room code
 const generateRoomCode = () => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -51,65 +54,117 @@ const generateDataset = (size = 20, min = 1, max = 100, allowDuplicates = false)
 // Room model implementation
 class Room {
   constructor(data) {
-    Object.assign(this, data);
-    this.status = this.status || 'waiting';
-    this.datasetSize = this.datasetSize || 20;
-    this.allowDuplicates = this.allowDuplicates || false;
-    this.valueRange = this.valueRange || { min: 1, max: 100 };
-    this.stepSpeed = this.stepSpeed || 500;
-    this.createdAt = this.createdAt || new Date();
+    // Set default values
+    this._id = Date.now().toString();
+    this.status = 'waiting';
+    this.datasetSize = 20;
+    this.allowDuplicates = false;
+    this.valueRange = { min: 1, max: 100 };
+    this.stepSpeed = 500;
+    this.createdAt = new Date();
+    this.players = [];
     
-    if (!this._id) {
-      this._id = Date.now().toString();
+    // Apply supplied data over defaults
+    Object.assign(this, data);
+    
+    // Ensure the code is always set and accessible
+    if (!this.code) {
+      throw new Error('Room code is required');
     }
+    
+    console.log(`[Room] Created room object with code: ${this.code}`);
   }
   
-  static findOne(query) {
-    if (query.code) {
-      return Promise.resolve(db.rooms.get(query.code) || null);
+  static async findOne(query) {
+    if (!query || !query.code) {
+      console.log('[DB] findOne called with invalid query');
+      return null;
     }
-    return Promise.resolve(null);
+    
+    const roomCode = query.code.toUpperCase();
+    const room = db.rooms.get(roomCode);
+    
+    console.log(`[DB] findOne for room code: ${roomCode}, found: ${room !== null && room !== undefined}`);
+    console.log(`[DB] All rooms: ${JSON.stringify(Array.from(db.rooms.keys()))}`);
+    
+    if (room) {
+      console.log(`[DB] Found room: ${roomCode}`);
+    } else {
+      console.log(`[DB] Room not found: ${roomCode}`);
+    }
+    
+    return room;
   }
 
-  static create(data) {
+  static async create(data) {
+    if (!data || !data.code) {
+      throw new Error('Room code is required');
+    }
+    
+    // Ensure code is uppercase
+    const roomCode = data.code.toUpperCase();
+    data.code = roomCode;
+    
+    // Create new room
     const room = new Room(data);
-    db.rooms.set(data.code, room);
-    return Promise.resolve(room);
+    
+    // Store in database
+    db.rooms.set(roomCode, room);
+    
+    console.log(`[DB] Created room: ${roomCode}`);
+    console.log(`[DB] All rooms: ${JSON.stringify(Array.from(db.rooms.keys()))}`);
+    
+    return room;
   }
 
-  save() {
-    db.rooms.set(this.code, this);
-    return Promise.resolve(this);
+  async save() {
+    if (!this.code) {
+      throw new Error('Room code is required');
+    }
+    
+    // Ensure code is uppercase
+    const roomCode = this.code.toUpperCase();
+    this.code = roomCode;
+    
+    // Store in database
+    db.rooms.set(roomCode, this);
+    
+    console.log(`[DB] Saved room: ${roomCode}`);
+    return this;
   }
   
-  static findById(id) {
+  static async findById(id) {
     for (const [code, room] of db.rooms.entries()) {
       if (room._id === id) {
-        return Promise.resolve(room);
+        return room;
       }
     }
-    return Promise.resolve(null);
+    return null;
   }
   
-  static findOneAndDelete(query) {
+  static async findOneAndDelete(query) {
     if (query.code) {
-      const room = db.rooms.get(query.code);
+      const roomCode = query.code.toUpperCase();
+      const room = db.rooms.get(roomCode);
+      
       if (room) {
-        db.rooms.delete(query.code);
-        return Promise.resolve(room);
+        db.rooms.delete(roomCode);
+        console.log(`[DB] Deleted room: ${roomCode}`);
+        return room;
       }
     } else if (query._id) {
       for (const [code, room] of db.rooms.entries()) {
         if (room._id === query._id) {
           db.rooms.delete(code);
-          return Promise.resolve(room);
+          console.log(`[DB] Deleted room with ID: ${query._id}`);
+          return room;
         }
       }
     }
-    return Promise.resolve(null);
+    return null;
   }
   
-  static find(query = {}) {
+  static async find(query = {}) {
     const results = [];
     
     for (const [code, room] of db.rooms.entries()) {
@@ -128,13 +183,32 @@ class Room {
       }
     }
     
-    return Promise.resolve(results);
+    return results;
   }
 }
 
-// Simple initialization function (no actual database to connect to)
-const initializeDatabase = () => {
+// Initialize database and create test rooms if needed
+const initializeDatabase = async () => {
   console.log('In-memory database initialized');
+  
+  // Create a test room for debugging
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      const testRoomCode = 'TEST01';
+      if (!db.rooms.has(testRoomCode)) {
+        await Room.create({
+          code: testRoomCode,
+          host: 'test-host-id',
+          hostUsername: 'TestHost',
+          algorithms: ['bubble', 'quick', 'merge'],
+        });
+        console.log(`[DB] Created test room: ${testRoomCode}`);
+      }
+    } catch (err) {
+      console.error('[DB] Error creating test room:', err);
+    }
+  }
+  
   return Promise.resolve();
 };
 

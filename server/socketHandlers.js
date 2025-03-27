@@ -32,28 +32,43 @@ const registerSocketHandlers = (io) => {
     // Handle room joining
     socket.on('join_room', async ({ roomCode, username }) => {
       try {
+        console.log(`[JOIN] Attempting to join room: ${roomCode} with username: ${username}`);
+        
         // Validate input
         if (!roomCode || !roomCode.trim()) {
+          console.log(`[JOIN] Error: Room code is required`);
           socket.emit('room_error', { message: 'Room code is required' });
           return;
         }
 
+        // Normalize room code to uppercase
+        const normalizedRoomCode = roomCode.trim().toUpperCase();
+        console.log(`[JOIN] Normalized room code: ${normalizedRoomCode}`);
+        
         // Update username if provided
         if (username) {
           socket.username = username;
           socketUsernames.set(socket.id, username);
+          console.log(`[JOIN] Updated username to: ${username} for socket: ${socket.id}`);
         }
         
         const Room = getModel('Room');
-        const room = await Room.findOne({ code: roomCode });
+        console.log(`[JOIN] Looking for room with code: ${normalizedRoomCode}`);
+        
+        // Debug - dump all rooms
+        console.log(`[JOIN] Available rooms: ${JSON.stringify(Array.from(global.getInMemoryDB().rooms.keys()))}`);
+        
+        const room = await Room.findOne({ code: normalizedRoomCode });
         
         if (!room) {
-          socket.emit('room_error', { message: 'Room not found with code: ' + roomCode });
+          console.log(`[JOIN] Error: Room not found with code: ${normalizedRoomCode}`);
+          socket.emit('room_error', { message: 'Room not found with code: ' + normalizedRoomCode });
           return;
         }
         
+        console.log(`[JOIN] Room found, joining socket to room: ${normalizedRoomCode}`);
         // Join the socket to the room
-        socket.join(roomCode);
+        socket.join(normalizedRoomCode);
         
         // Add player to room if not already present
         const player = {
@@ -61,36 +76,51 @@ const registerSocketHandlers = (io) => {
           username: socket.username
         };
         
+        // Ensure players array exists and add the player
+        if (!room.players) {
+          room.players = [];
+        }
+        
+        // Add player to room's player list if not already present
+        const playerExists = room.players.some(p => p.socketId === socket.id);
+        if (!playerExists) {
+          room.players.push(player);
+          await room.save();
+        }
+        
         // Send room joined confirmation
-        socket.emit('room_joined', { roomCode });
+        console.log(`[JOIN] Emitting room_joined event to client with room code: ${normalizedRoomCode}`);
+        socket.emit('room_joined', { roomCode: normalizedRoomCode });
         
         // Get all players currently in the socket room
-        const socketsInRoom = await io.in(roomCode).fetchSockets();
+        const socketsInRoom = await io.in(normalizedRoomCode).fetchSockets();
         const players = socketsInRoom.map(s => ({
           socketId: s.id,
           username: socketUsernames.get(s.id) || `Player_${s.id.substring(0, 6)}`
         }));
         
+        console.log(`[JOIN] Players in room: ${JSON.stringify(players)}`);
+        
         // Notify players in the room
-        io.to(roomCode).emit('room_players', { players });
+        io.to(normalizedRoomCode).emit('room_players', { players });
         
         // Notify other users in the room about the new user
-        socket.to(roomCode).emit('user_joined', player);
+        socket.to(normalizedRoomCode).emit('user_joined', player);
         
         // Send current race status if race is in progress
-        const raceStatus = getRaceStatus(roomCode);
+        const raceStatus = getRaceStatus(normalizedRoomCode);
         if (raceStatus.exists) {
           socket.emit('race_status', raceStatus);
         } else {
           // Send current algorithms
           socket.emit('algorithms_updated', {
-            roomCode,
+            roomCode: normalizedRoomCode,
             algorithms: room.algorithms
           });
           
           // Send current settings
           socket.emit('settings_updated', {
-            roomCode,
+            roomCode: normalizedRoomCode,
             settings: {
               datasetSize: room.datasetSize,
               allowDuplicates: room.allowDuplicates,
@@ -100,7 +130,7 @@ const registerSocketHandlers = (io) => {
           });
         }
         
-        console.log(`User ${socket.username} (${socket.id}) joined room ${roomCode}`);
+        console.log(`User ${socket.username} (${socket.id}) joined room ${normalizedRoomCode}`);
         
       } catch (error) {
         console.error('Error joining room:', error);
@@ -111,8 +141,11 @@ const registerSocketHandlers = (io) => {
     // Handle room creation
     socket.on('create_room', async ({ algorithms = ['bubble', 'quick', 'merge'], username }) => {
       try {
+        console.log(`[CREATE] Attempting to create room with algorithms: ${algorithms} and username: ${username}`);
+        
         // Validate algorithms
         if (!algorithms || !Array.isArray(algorithms) || algorithms.length < 2) {
+          console.log(`[CREATE] Error: Must select at least 2 algorithms`);
           socket.emit('room_error', { message: 'Must select at least 2 algorithms' });
           return;
         }
@@ -121,6 +154,7 @@ const registerSocketHandlers = (io) => {
         if (username) {
           socket.username = username;
           socketUsernames.set(socket.id, username);
+          console.log(`[CREATE] Updated username to: ${username} for socket: ${socket.id}`);
         }
         
         // Generate a unique room code
@@ -132,21 +166,31 @@ const registerSocketHandlers = (io) => {
           const Room = getModel('Room');
           const existingRoom = await Room.findOne({ code });
           isUnique = !existingRoom;
+          console.log(`[CREATE] Generated code: ${code}, isUnique: ${isUnique}`);
         }
+        
+        // Ensure code is uppercase
+        code = code.toUpperCase();
   
         // Create room with selected algorithms
         const Room = getModel('Room');
+        console.log(`[CREATE] Creating room with code: ${code}`);
         const room = await Room.create({
           code,
           host: socket.id,
           hostUsername: socket.username,
-          players: [],
+          players: [{
+            socketId: socket.id,
+            username: socket.username
+          }],
           algorithms: algorithms
         });
   
         // Join the socket to the room
+        console.log(`[CREATE] Joining socket to room: ${code}`);
         socket.join(code);
         
+        console.log(`[CREATE] Emitting room_created event to client`);
         socket.emit('room_created', { 
           roomCode: code,
           isHost: true
@@ -167,6 +211,17 @@ const registerSocketHandlers = (io) => {
         socket.emit('algorithms_updated', {
           roomCode: code,
           algorithms
+        });
+        
+        // Send initial settings to client
+        socket.emit('settings_updated', {
+          roomCode: code,
+          settings: {
+            datasetSize: room.datasetSize,
+            allowDuplicates: room.allowDuplicates,
+            valueRange: room.valueRange,
+            stepSpeed: room.stepSpeed
+          }
         });
         
         console.log(`User ${socket.username} (${socket.id}) created room ${code}`);

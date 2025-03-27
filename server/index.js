@@ -7,6 +7,14 @@ const { initializeDatabase } = require('./config/db');
 const { registerSocketHandlers } = require('./socketHandlers');
 require('dotenv').config();
 
+// Set development mode if not specified
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+  console.log('Environment not specified, defaulting to development mode');
+}
+
+console.log(`Running in ${process.env.NODE_ENV} mode`);
+
 // Initialize in-memory database
 initializeDatabase();
 
