@@ -34,6 +34,12 @@ const registerSocketHandlers = (io) => {
     // Handle room joining
     socket.on('join_room', async ({ roomCode, username }) => {
       try {
+        // Validate input
+        if (!roomCode || !roomCode.trim()) {
+          socket.emit('room_error', { message: 'Room code is required' });
+          return;
+        }
+
         // Update username if provided
         if (username) {
           socket.username = username;
@@ -43,7 +49,7 @@ const registerSocketHandlers = (io) => {
         const room = await Room.findOne({ code: roomCode });
         
         if (!room) {
-          socket.emit('room_error', { message: 'Room not found' });
+          socket.emit('room_error', { message: 'Room not found with code: ' + roomCode });
           return;
         }
         
@@ -82,17 +88,36 @@ const registerSocketHandlers = (io) => {
             roomCode,
             algorithms: room.algorithms
           });
+          
+          // Send current settings
+          socket.emit('settings_updated', {
+            roomCode,
+            settings: {
+              datasetSize: room.datasetSize,
+              allowDuplicates: room.allowDuplicates,
+              valueRange: room.valueRange,
+              stepSpeed: room.stepSpeed
+            }
+          });
         }
+        
+        console.log(`User ${socket.username} (${socket.id}) joined room ${roomCode}`);
         
       } catch (error) {
         console.error('Error joining room:', error);
-        socket.emit('room_error', { message: 'Server error' });
+        socket.emit('room_error', { message: 'Server error when joining room: ' + error.message });
       }
     });
     
     // Handle room creation
     socket.on('create_room', async ({ algorithms = ['bubble', 'quick', 'merge'], username }) => {
       try {
+        // Validate algorithms
+        if (!algorithms || !Array.isArray(algorithms) || algorithms.length < 2) {
+          socket.emit('room_error', { message: 'Must select at least 2 algorithms' });
+          return;
+        }
+        
         // Update username if provided
         if (username) {
           socket.username = username;
@@ -143,9 +168,11 @@ const registerSocketHandlers = (io) => {
           algorithms
         });
         
+        console.log(`User ${socket.username} (${socket.id}) created room ${code}`);
+        
       } catch (error) {
         console.error('Error creating room:', error);
-        socket.emit('room_error', { message: 'Server error' });
+        socket.emit('room_error', { message: 'Server error when creating room: ' + error.message });
       }
     });
     

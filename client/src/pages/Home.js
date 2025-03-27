@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
+import SocketContext from '../context/SocketContext';
 
 const Home = () => {
+  const { connected } = useContext(SocketContext);
+  
   return (
     <div className="home-page">
       <div className="hero">
@@ -13,6 +16,10 @@ const Home = () => {
           <Link to="/dashboard" className="btn btn-primary">
             Join a Game
           </Link>
+        </div>
+        <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}
+             style={{ marginTop: '1rem', display: 'inline-block' }}>
+          Server Status: {connected ? 'Connected' : 'Connecting...'}
         </div>
       </div>
 

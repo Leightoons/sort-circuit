@@ -566,6 +566,27 @@ p {
   margin-bottom: 2rem;
 }
 
+/* Connection status */
+.connection-status {
+  padding: 0.5rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.connection-status.connected {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.connection-status.disconnected {
+  background-color: rgba(255, 143, 0, 0.1);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .grid-3,

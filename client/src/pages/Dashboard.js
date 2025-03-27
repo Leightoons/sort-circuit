@@ -8,9 +8,11 @@ const Dashboard = () => {
   const [selectedAlgorithms, setSelectedAlgorithms] = useState(['bubble', 'quick', 'merge']);
   const [joinError, setJoinError] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   
   const { username, setUsername, createRoom, joinRoom, connected } = useContext(SocketContext);
-  const { currentRoom } = useContext(RoomContext);
+  const { currentRoom, error } = useContext(RoomContext);
   const navigate = useNavigate();
 
   // Initialize username from context or create a temporary one
@@ -21,6 +23,15 @@ const Dashboard = () => {
       setUsernameInput(username);
     }
   }, [username]);
+
+  // Update error message when RoomContext error changes
+  useEffect(() => {
+    if (error) {
+      setJoinError(error);
+      setIsCreatingRoom(false);
+      setIsJoiningRoom(false);
+    }
+  }, [error]);
 
   // Check if socket connected before allowing room operations
   const isReady = connected;
@@ -50,7 +61,14 @@ const Dashboard = () => {
       return;
     }
     
+    setJoinError('');
+    setIsCreatingRoom(true);
     createRoom(selectedAlgorithms, usernameInput);
+    
+    // Reset creating status after timeout (in case of silent failure)
+    setTimeout(() => {
+      setIsCreatingRoom(false);
+    }, 5000);
   };
 
   // Join an existing room
@@ -72,7 +90,14 @@ const Dashboard = () => {
       return;
     }
     
+    setJoinError('');
+    setIsJoiningRoom(true);
     joinRoom(roomCode, usernameInput);
+    
+    // Reset joining status after timeout (in case of silent failure)
+    setTimeout(() => {
+      setIsJoiningRoom(false);
+    }, 5000);
   };
 
   // Navigate to room page when we have a room
@@ -85,6 +110,10 @@ const Dashboard = () => {
     <div className="dashboard-page">
       <h1>Dashboard</h1>
       <p className="lead">Create or join a room to start racing algorithms!</p>
+      
+      <div className={`connection-status ${isReady ? 'connected' : 'disconnected'}`}>
+        Connection Status: {isReady ? 'Connected' : 'Connecting...'}
+      </div>
 
       <div className="username-section card">
         <h3>Your Username</h3>
@@ -120,9 +149,9 @@ const Dashboard = () => {
             <button
               type="submit"
               className="btn btn-primary btn-block"
-              disabled={!isReady || !usernameInput.trim()}
+              disabled={!isReady || !usernameInput.trim() || isJoiningRoom}
             >
-              Join Room
+              {isJoiningRoom ? 'Joining...' : 'Join Room'}
             </button>
           </form>
         </div>
@@ -189,9 +218,9 @@ const Dashboard = () => {
           <button
             onClick={handleCreateRoom}
             className="btn btn-primary btn-block"
-            disabled={!isReady || selectedAlgorithms.length < 2 || !usernameInput.trim()}
+            disabled={!isReady || selectedAlgorithms.length < 2 || !usernameInput.trim() || isCreatingRoom}
           >
-            Create Room
+            {isCreatingRoom ? 'Creating...' : 'Create Room'}
           </button>
         </div>
       </div>

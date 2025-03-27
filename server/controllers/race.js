@@ -254,21 +254,10 @@ const getBetsForRoom = (roomCode) => {
   return roomBets;
 };
 
-// @desc    Clear bets for a room
-// @access  Server-only
-const clearRoomBets = (roomCode) => {
-  for (const [key, bet] of bets.entries()) {
-    if (bet.roomCode === roomCode) {
-      bets.delete(key);
-    }
-  }
-};
-
 module.exports = {
-  startRace,
-  getRaceStatus,
-  stopRace,
-  placeBet,
-  getBetsForRoom,
-  clearRoomBets
+  startRace: exports.startRace,
+  getRaceStatus: exports.getRaceStatus,
+  stopRace: exports.stopRace,
+  placeBet: exports.placeBet,
+  getBetsForRoom
 }; 

@@ -44,6 +44,7 @@ export const RoomProvider = ({ children }) => {
     socket.on('room_joined', ({ roomCode }) => {
       setCurrentRoom(roomCode);
       setRoomStatus('waiting');
+      setError(null);
     });
 
     // Room error event
