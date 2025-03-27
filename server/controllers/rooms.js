@@ -1,42 +1,45 @@
-const Room = require('../models/Room');
+const { getModel } = require('../config/db');
 const User = require('../models/User');
 const { generateDataset } = require('../utils/algorithmEngine');
 
 // @desc    Create a new room
 // @route   POST /api/rooms
-// @access  Private
+// @access  Public
 exports.createRoom = async (req, res) => {
   try {
-    // Generate a unique room code
-    let code;
-    let isUnique = false;
-
-    while (!isUnique) {
-      code = Room.generateRoomCode();
-      const existingRoom = await Room.findOne({ code });
-      isUnique = !existingRoom;
+    const { code, host, algorithms } = req.body;
+    
+    // Validate input
+    if (!code || !host) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
-
-    // Create room with default algorithms selected
+    
+    // Check if room with code already exists
+    const Room = getModel('Room');
+    const existingRoom = await Room.findOne({ code });
+    
+    if (existingRoom) {
+      return res.status(400).json({ message: 'Room with this code already exists' });
+    }
+    
+    // Create room with default settings
     const room = await Room.create({
       code,
-      host: req.user.id,
-      players: [req.user.id],
-      algorithms: ['bubble', 'quick', 'merge']
+      host,
+      algorithms: algorithms || ['bubble', 'quick', 'merge']
     });
-
-    // Populate host and players info
+    
+    // Return room details
     const populatedRoom = await Room.findById(room._id)
-      .populate('host', 'username')
-      .populate('players', 'username');
-
+    
     res.status(201).json({
       success: true,
       data: populatedRoom
     });
+    
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

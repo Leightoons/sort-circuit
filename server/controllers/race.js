@@ -1,6 +1,6 @@
-const Room = require('../models/Room');
 const { createAlgorithm, generateDataset } = require('../utils/algorithmEngine');
 const { getAllBetsForRoom, clearRoomBets } = require('./bets');
+const { getModel } = require('../config/db');
 
 // In-memory store for active races
 const activeRaces = new Map();
@@ -14,6 +14,7 @@ exports.startRace = async (io, socket, roomCode, room) => {
   try {
     if (!room) {
       // Find room if not provided
+      const Room = getModel('Room');
       room = await Room.findOne({ code: roomCode });
       
       if (!room) {
@@ -135,6 +136,7 @@ const finalizeRace = async (io, roomCode) => {
     }
     
     // Get room
+    const Room = getModel('Room');
     const room = await Room.findOne({ code: roomCode });
     if (!room) {
       return;

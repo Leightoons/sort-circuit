@@ -1,4 +1,4 @@
-const Room = require('../models/Room');
+const { getModel } = require('../config/db');
 const User = require('../models/User');
 
 // We'll create a simple in-memory store for bets since they're temporary
@@ -21,6 +21,7 @@ exports.placeBet = async (req, res) => {
     }
 
     // Check if room exists
+    const Room = getModel('Room');
     const room = await Room.findOne({ code: roomCode });
     if (!room) {
       return res.status(404).json({
@@ -75,6 +76,7 @@ exports.getRoomBets = async (req, res) => {
     const roomCode = req.params.code;
     
     // Check if room exists
+    const Room = getModel('Room');
     const room = await Room.findOne({ code: roomCode });
     if (!room) {
       return res.status(404).json({

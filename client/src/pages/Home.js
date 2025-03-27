@@ -3,7 +3,16 @@ import { Link } from 'react-router-dom';
 import SocketContext from '../context/SocketContext';
 
 const Home = () => {
-  const { connected } = useContext(SocketContext);
+  const { connected, createRoom } = useContext(SocketContext);
+  
+  const handleTestCreateRoom = () => {
+    if (connected) {
+      createRoom(['bubble', 'quick', 'merge'], 'TestUser');
+      console.log('Test room creation initiated');
+    } else {
+      console.log('Not connected to server');
+    }
+  };
   
   return (
     <div className="home-page">
@@ -16,6 +25,14 @@ const Home = () => {
           <Link to="/dashboard" className="btn btn-primary">
             Join a Game
           </Link>
+          <button 
+            onClick={handleTestCreateRoom} 
+            className="btn btn-secondary"
+            style={{ marginLeft: '10px' }}
+            disabled={!connected}
+          >
+            Test Room Creation
+          </button>
         </div>
         <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}
              style={{ marginTop: '1rem', display: 'inline-block' }}>
