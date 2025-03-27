@@ -220,6 +220,11 @@ p {
   margin-left: 1.5rem;
 }
 
+.navbar .connection-status-container {
+  display: flex;
+  align-items: center;
+}
+
 /* Home page */
 .home-page .hero {
   text-align: center;
@@ -350,11 +355,20 @@ p {
   border-radius: 4px;
   margin-right: 0.5rem;
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
 }
 
 .room-players li.current-user {
   background-color: var(--color-primary);
   color: white;
+}
+
+.bet-indicator {
+  margin-left: 8px;
+  font-size: 1.1rem;
+  animation: pulse 1.5s infinite;
+  cursor: help;
 }
 
 /* Host controls */
@@ -468,13 +482,17 @@ p {
 }
 
 .data-block {
-  flex: 1;
   background-color: var(--color-primary);
+  margin: 0 2px;
+  flex: 1;
+  position: relative;
   color: white;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease, background-color 0.3s ease, transform 0.3s ease;
 }
 
 .room-sidebar {
@@ -568,33 +586,33 @@ p {
 
 /* Connection status */
 .connection-status {
-  padding: 0.5rem 1rem;
-  margin-bottom: 1.5rem;
-  border-radius: 4px;
-  text-align: center;
-  font-weight: 500;
   cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   transition: all 0.3s ease;
 }
 
 .connection-status:hover {
-  opacity: 0.9;
+  opacity: 0.8;
 }
 
 .connection-status.connected {
-  background-color: rgba(76, 175, 80, 0.1);
+  background-color: rgba(76, 175, 80, 0.2);
   color: var(--color-success);
   border: 1px solid var(--color-success);
 }
 
 .connection-status.disconnected {
-  background-color: rgba(244, 67, 54, 0.1);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
+  background-color: rgba(244, 67, 54, 0.2);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
 }
 
 .connection-status.reconnecting {
-  background-color: rgba(255, 143, 0, 0.1);
+  background-color: rgba(255, 143, 0, 0.2);
   color: var(--color-warning);
   border: 1px solid var(--color-warning);
 }
@@ -602,43 +620,43 @@ p {
 .status-indicator {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .status-dot {
-  display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  animation: pulse 2s infinite;
 }
 
 .connected .status-dot {
   background-color: var(--color-success);
-  box-shadow: 0 0 5px var(--color-success);
+  animation: none;
 }
 
 .disconnected .status-dot {
-  background-color: var(--color-danger);
-  box-shadow: 0 0 5px var(--color-danger);
+  background-color: var(--color-error);
+  animation: none;
 }
 
 .reconnecting .status-dot {
   background-color: var(--color-warning);
-  box-shadow: 0 0 5px var(--color-warning);
-  animation: pulse 1.5s infinite;
 }
 
 .connection-details {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed;
+  margin-top: 8px;
   font-size: 0.8rem;
-  text-align: left;
+  padding: 8px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  color: var(--color-text);
 }
 
 .connection-details p {
-  margin: 0.25rem 0;
+  margin-bottom: 4px;
 }
 
 @keyframes pulse {
@@ -693,4 +711,73 @@ p {
   min-height: 200px;
   font-size: 1.25rem;
   color: var(--color-text-light);
+}
+
+/* Notifications */
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  max-width: 300px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notification {
+  padding: 12px 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  animation: slide-in 0.3s ease-out;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notification-info {
+  background-color: var(--color-info);
+  color: white;
+}
+
+.notification-error {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.notification-bet {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.notification-message {
+  margin-right: 24px;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0.7;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }

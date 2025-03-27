@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ConnectionStatus from './ConnectionStatus';
 
 const Navbar = () => {
   return (
@@ -11,6 +12,9 @@ const Navbar = () => {
       <ul>
         <li>
           <Link to="/dashboard">Join/Create Game</Link>
+        </li>
+        <li className="connection-status-container">
+          <ConnectionStatus />
         </li>
       </ul>
     </nav>

@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
+import Notifications from '../components/layout/Notifications';
 
 const Room = () => {
   const { roomCode } = useParams();
@@ -476,6 +477,7 @@ const Room = () => {
   
   return (
     <div className="room-page">
+      <Notifications />
       <div className="room-header">
         <h1>Room: {roomCode}</h1>
         <div className="room-status">
@@ -496,12 +498,18 @@ const Room = () => {
       <div className="room-players">
         <h3>Players ({players.length})</h3>
         <ul>
-          {players.map(player => (
-            <li key={player.socketId} className={player.username === username ? 'current-user' : ''}>
-              {player.username} {player.username === username ? '(You)' : ''}
-              {isHost && player.socketId === socket.id && ' (Host)'}
-            </li>
-          ))}
+          {players.map(player => {
+            // Check if player has placed a bet
+            const hasBet = allBets.some(bet => bet.socketId === player.socketId);
+            
+            return (
+              <li key={player.socketId} className={player.username === username ? 'current-user' : ''}>
+                {player.username} {player.username === username ? '(You)' : ''}
+                {isHost && player.socketId === socket.id && ' (Host)'}
+                {hasBet && <span className="bet-indicator" title={`Has placed a bet`}>🎲</span>}
+              </li>
+            );
+          })}
         </ul>
       </div>
       

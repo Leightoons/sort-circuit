@@ -122,6 +122,9 @@ const registerSocketHandlers = (io) => {
       }
       
       lastHeartbeats.set(socket.id, now);
+      
+      // Send heartbeat acknowledgment back to client
+      socket.emit('heartbeat_ack');
     });
     
     // Handle room joining
@@ -317,10 +320,17 @@ const registerSocketHandlers = (io) => {
           }],
           algorithms: algorithms
         });
+        
+        console.log(`[CREATE] Room created successfully with ID: ${room._id}, code: ${code}, host: ${socket.id}`);
   
         // Join the socket to the room
         console.log(`[CREATE] Joining socket to room: ${code}`);
         socket.join(code);
+        
+        // Verify socket was added to room
+        const socketsInRoom = await io.in(code).fetchSockets();
+        console.log(`[CREATE] Sockets in room ${code} after join: ${socketsInRoom.length}`);
+        console.log(`[CREATE] Socket IDs in room: ${socketsInRoom.map(s => s.id).join(', ')}`);
         
         console.log(`[CREATE] Emitting room_created event to client`);
         socket.emit('room_created', { 
@@ -550,29 +560,57 @@ const registerSocketHandlers = (io) => {
         const room = await Room.findOne({ code: roomCode });
         if (room && room.host === socket.id) {
           // Get all sockets in the room
-          const socketsInRoom = await io.in(roomCode).fetchSockets();
+          const socketsInRoom = await io.in(room.code).fetchSockets();
           
-          if (socketsInRoom.length > 0) {
-            // Assign a new host
-            const newHostSocket = socketsInRoom[0];
-            room.host = newHostSocket.id;
-            room.hostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
-            await room.save();
-            
-            // Notify the new host
-            io.to(newHostSocket.id).emit('host_assigned', { roomCode });
-            
-            // Notify all users in the room about the new host
-            io.to(roomCode).emit('host_changed', {
-              socketId: newHostSocket.id,
-              username: socketUsernames.get(newHostSocket.id) || 'New Host'
-            });
+          if (socketsInRoom.length > 0 || (room.players && room.players.length > 1)) {
+            // If sockets are found in the room, assign one as the new host
+            if (socketsInRoom.length > 0) {
+              // Assign a new host
+              const newHostSocket = socketsInRoom[0];
+              const newHostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
+              room.host = newHostSocket.id;
+              room.hostUsername = newHostUsername;
+              await room.save();
+              
+              // Notify the new host
+              io.to(newHostSocket.id).emit('host_assigned', { roomCode: room.code });
+              
+              // Notify all users in the room about the new host
+              io.to(room.code).emit('host_changed', {
+                socketId: newHostSocket.id,
+                username: newHostUsername
+              });
+
+              console.log(`[DISCONNECT] Reassigned host in room ${room.code} from ${socket.username} to ${newHostUsername}`);
+            }
+            // If no sockets found but there are still players in the room (other than the disconnecting one)
+            else if (room.players.length > 1) {
+              // Find a player who isn't the disconnecting socket
+              const newHostPlayer = room.players.find(p => p.socketId !== socket.id);
+              if (newHostPlayer) {
+                room.host = newHostPlayer.socketId;
+                room.hostUsername = newHostPlayer.username;
+                await room.save();
+                
+                console.log(`[DISCONNECT] Assigned new host ${newHostPlayer.username} from players array in room ${room.code}`);
+                
+                // Try to notify the new host
+                io.to(newHostPlayer.socketId).emit('host_assigned', { roomCode: room.code });
+                
+                // Notify all users in the room about the new host
+                io.to(room.code).emit('host_changed', {
+                  socketId: newHostPlayer.socketId,
+                  username: newHostPlayer.username
+                });
+              }
+            }
           } else {
             // No users left, delete the room
-            await Room.findOneAndDelete({ code: roomCode });
+            console.log(`[DISCONNECT] Deleting empty room ${room.code} after host ${socket.username} disconnected`);
+            await Room.findOneAndDelete({ _id: room._id });
             
             // Clean up any active races
-            stopRace(roomCode);
+            stopRace(room.code);
           }
         }
         
@@ -595,24 +633,48 @@ const registerSocketHandlers = (io) => {
           // Get all sockets in the room
           const socketsInRoom = await io.in(room.code).fetchSockets();
           
-          if (socketsInRoom.length > 0) {
-            // Assign a new host
-            const newHostSocket = socketsInRoom[0];
-            const newHostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
-            room.host = newHostSocket.id;
-            room.hostUsername = newHostUsername;
-            await room.save();
-            
-            // Notify the new host
-            io.to(newHostSocket.id).emit('host_assigned', { roomCode: room.code });
-            
-            // Notify all users in the room about the new host
-            io.to(room.code).emit('host_changed', {
-              socketId: newHostSocket.id,
-              username: newHostUsername
-            });
+          if (socketsInRoom.length > 0 || (room.players && room.players.length > 1)) {
+            // If sockets are found in the room, assign one as the new host
+            if (socketsInRoom.length > 0) {
+              // Assign a new host
+              const newHostSocket = socketsInRoom[0];
+              const newHostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
+              room.host = newHostSocket.id;
+              room.hostUsername = newHostUsername;
+              await room.save();
+              
+              // Notify the new host
+              io.to(newHostSocket.id).emit('host_assigned', { roomCode: room.code });
+              
+              // Notify all users in the room about the new host
+              io.to(room.code).emit('host_changed', {
+                socketId: newHostSocket.id,
+                username: newHostUsername
+              });
 
-            console.log(`[DISCONNECT] Reassigned host in room ${room.code} from ${disconnectedUsername} to ${newHostUsername}`);
+              console.log(`[DISCONNECT] Reassigned host in room ${room.code} from ${disconnectedUsername} to ${newHostUsername}`);
+            }
+            // If no sockets found but there are still players in the room (other than the disconnecting one)
+            else if (room.players.length > 1) {
+              // Find a player who isn't the disconnecting socket
+              const newHostPlayer = room.players.find(p => p.socketId !== socket.id);
+              if (newHostPlayer) {
+                room.host = newHostPlayer.socketId;
+                room.hostUsername = newHostPlayer.username;
+                await room.save();
+                
+                console.log(`[DISCONNECT] Assigned new host ${newHostPlayer.username} from players array in room ${room.code}`);
+                
+                // Try to notify the new host
+                io.to(newHostPlayer.socketId).emit('host_assigned', { roomCode: room.code });
+                
+                // Notify all users in the room about the new host
+                io.to(room.code).emit('host_changed', {
+                  socketId: newHostPlayer.socketId,
+                  username: newHostPlayer.username
+                });
+              }
+            }
           } else {
             // No users left, delete the room
             console.log(`[DISCONNECT] Deleting empty room ${room.code} after host ${disconnectedUsername} disconnected`);
@@ -634,18 +696,24 @@ const registerSocketHandlers = (io) => {
             
             // Remove player from room
             room.players.splice(playerIndex, 1);
-            await room.save();
             
-            // Notify remaining players
-            io.to(room.code).emit('user_left', {
-              socketId: socket.id,
-              username: playerUsername
-            });
-            
-            // Notify about updated player list
-            io.to(room.code).emit('room_players', { 
-              players: room.players 
-            });
+            // Only save if the room still exists (double-check)
+            try {
+              await room.save();
+              
+              // Notify remaining players
+              io.to(room.code).emit('user_left', {
+                socketId: socket.id,
+                username: playerUsername
+              });
+              
+              // Notify about updated player list
+              io.to(room.code).emit('room_players', { 
+                players: room.players 
+              });
+            } catch (saveError) {
+              console.error(`[DISCONNECT] Error saving room ${room.code} after player removal: ${saveError.message}`);
+            }
           }
         }
         
