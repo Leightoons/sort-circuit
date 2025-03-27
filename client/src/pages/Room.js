@@ -4,6 +4,15 @@ import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
 import Notifications from '../components/layout/Notifications';
 
+// Define the preferred algorithm display order
+const ALGORITHM_ORDER = {
+  'bubble': 1,
+  'insertion': 2,
+  'selection': 3,
+  'merge': 4,
+  'quick': 5
+};
+
 const Room = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
@@ -166,7 +175,7 @@ const Room = () => {
     const { dataset, finished, position, comparisons, swaps } = algorithmData;
     
     return (
-      <div className={`algorithm-visualization ${finished ? 'finished' : 'racing'}`}>
+      <div className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${algorithmData.lastOperation ? 'last-updated' : ''}`}>
         <h3>{algorithmType.charAt(0).toUpperCase() + algorithmType.slice(1)} Sort</h3>
         
         <div className="visualization-stats">
@@ -191,21 +200,35 @@ const Room = () => {
         </div>
         
         <div className="data-blocks">
-          {dataset && dataset.map((value, index) => (
-            <div 
-              key={index} 
-              className="data-block"
-              style={{ 
-                height: `${(value / Math.max(...dataset)) * 100}%`,
-                backgroundColor: algorithmData.lastOperation && 
-                  algorithmData.lastOperation.indices.includes(index) ? 
-                  algorithmData.lastOperation.type === 'comparison' ? 'var(--color-compare)' : 'var(--color-swap)' : 
-                  undefined
-              }}
-            >
-              {dataset.length <= 20 && value}
-            </div>
-          ))}
+          {dataset && dataset.map((value, index) => {
+            // Determine if this block should be highlighted
+            const shouldHighlight = algorithmData.lastOperation && 
+              algorithmData.lastOperation.indices.includes(index);
+            
+            // Choose color based on operation type and alternating flag
+            let backgroundColor = undefined;
+            if (shouldHighlight) {
+              const { type, alternate } = algorithmData.lastOperation;
+              if (type === 'comparison') {
+                backgroundColor = alternate ? 'var(--color-compare-alt)' : 'var(--color-compare)';
+              } else if (type === 'swap') {
+                backgroundColor = alternate ? 'var(--color-swap-alt)' : 'var(--color-swap)';
+              }
+            }
+            
+            return (
+              <div 
+                key={index} 
+                className="data-block"
+                style={{ 
+                  height: `${(value / Math.max(...dataset)) * 100}%`,
+                  backgroundColor
+                }}
+              >
+                {dataset.length <= 20 && value}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -228,22 +251,28 @@ const Room = () => {
         <p>Which algorithm do you think will finish first?</p>
         
         <div className="betting-options">
-          {algorithms.map(algo => (
-            <div key={algo} className="betting-option">
-              <input
-                type="radio"
-                id={`bet-${algo}`}
-                name="algorithm"
-                value={algo}
-                checked={selectedAlgorithm === algo}
-                onChange={() => setSelectedAlgorithm(algo)}
-                disabled={userBet !== null}
-              />
-              <label htmlFor={`bet-${algo}`}>
-                {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
-              </label>
-            </div>
-          ))}
+          {algorithms
+            .slice() // Create a copy to avoid mutating the original array
+            .sort((a, b) => {
+              // Sort by the defined order
+              return (ALGORITHM_ORDER[a] || 99) - (ALGORITHM_ORDER[b] || 99);
+            })
+            .map(algo => (
+              <div key={algo} className="betting-option">
+                <input
+                  type="radio"
+                  id={`bet-${algo}`}
+                  name="algorithm"
+                  value={algo}
+                  checked={selectedAlgorithm === algo}
+                  onChange={() => setSelectedAlgorithm(algo)}
+                  disabled={userBet !== null}
+                />
+                <label htmlFor={`bet-${algo}`}>
+                  {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
+                </label>
+              </div>
+            ))}
         </div>
         
         {userBet ? (
@@ -276,29 +305,39 @@ const Room = () => {
         </div>
         
         <div className="algorithm-results">
-          {Object.entries(results.results).sort((a, b) => a[1].position - b[1].position).map(([algo, data]) => (
-            <div key={algo} className={`algorithm-result ${data.isWinner ? 'winner' : ''}`}>
-              <h5>{algo.charAt(0).toUpperCase() + algo.slice(1)} Sort</h5>
-              <div className="result-stats">
-                <div className="stat">
-                  <span>Position:</span>
-                  <span>{data.position}</span>
-                </div>
-                <div className="stat">
-                  <span>Steps:</span>
-                  <span>{data.steps}</span>
-                </div>
-                <div className="stat">
-                  <span>Comparisons:</span>
-                  <span>{data.comparisons}</span>
-                </div>
-                <div className="stat">
-                  <span>Swaps:</span>
-                  <span>{data.swaps}</span>
+          {Object.entries(results.results)
+            .sort((a, b) => {
+              // Primary sort by position
+              if (a[1].position !== b[1].position) {
+                return a[1].position - b[1].position;
+              }
+              
+              // Secondary sort by algorithm name for consistent ordering
+              return (ALGORITHM_ORDER[a[0]] || 99) - (ALGORITHM_ORDER[b[0]] || 99);
+            })
+            .map(([algo, data]) => (
+              <div key={algo} className={`algorithm-result ${data.isWinner ? 'winner' : ''}`}>
+                <h5>{algo.charAt(0).toUpperCase() + algo.slice(1)} Sort</h5>
+                <div className="result-stats">
+                  <div className="stat">
+                    <span>Position:</span>
+                    <span>{data.position}</span>
+                  </div>
+                  <div className="stat">
+                    <span>Steps:</span>
+                    <span>{data.steps}</span>
+                  </div>
+                  <div className="stat">
+                    <span>Comparisons:</span>
+                    <span>{data.comparisons}</span>
+                  </div>
+                  <div className="stat">
+                    <span>Swaps:</span>
+                    <span>{data.swaps}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
         
         {userBet && (
@@ -547,11 +586,19 @@ const Room = () => {
           <h2>Sorting Algorithm Race</h2>
           
           <div className="algorithms-container">
-            {algorithms.map(algo => (
-              <div key={algo} className="algorithm-card">
-                {renderAlgorithmVisualization(algo)}
-              </div>
-            ))}
+            {/* Sort algorithms in a consistent order before rendering */}
+            {algorithms
+              .slice() // Create a copy to avoid mutating the original array
+              .sort((a, b) => {
+                // Sort by the defined order
+                return (ALGORITHM_ORDER[a] || 99) - (ALGORITHM_ORDER[b] || 99);
+              })
+              .map(algo => (
+                <div key={algo} className="algorithm-card">
+                  {renderAlgorithmVisualization(algo)}
+                </div>
+              ))
+            }
           </div>
         </div>
         

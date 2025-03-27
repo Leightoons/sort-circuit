@@ -39,8 +39,13 @@ export const SocketProvider = ({ children }) => {
         reconnectTimeoutRef.current = null;
       }
       
-      // Send immediate heartbeat on connect
-      newSocket.emit('heartbeat');
+      // Send initial heartbeat with a short delay to avoid ACK conflicts
+      setTimeout(() => {
+        if (newSocket.connected) {
+          newSocket.emit('heartbeat');
+          console.log('Sent initial heartbeat');
+        }
+      }, 500);
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -81,15 +86,30 @@ export const SocketProvider = ({ children }) => {
 
     // Clean up on unmount
     return () => {
+      console.log('SocketContext unmounting - cleaning up socket connections');
+      
+      // Remove all event listeners
+      newSocket.off('connect');
+      newSocket.off('disconnect');
+      newSocket.off('connect_error');
+      newSocket.off('host_assigned');
+      newSocket.off('room_created');
+      newSocket.off('heartbeat_ack');
+      
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
       
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
       }
       
-      newSocket.disconnect();
+      // Ensure socket is fully closed
+      if (newSocket.connected) {
+        newSocket.disconnect();
+      }
     };
   }, []);
 
@@ -103,10 +123,12 @@ export const SocketProvider = ({ children }) => {
     
     if (!socket || !connected) return;
 
-    // Send initial heartbeat immediately
-    socket.emit('heartbeat');
-    console.log('Sending initial heartbeat');
-    
+    // Setup heartbeat acknowledgment listener
+    socket.on('heartbeat_ack', () => {
+      // Just receive the acknowledgment, no need to do anything with it
+      console.log('Received heartbeat acknowledgment');
+    });
+
     // Choose interval based on whether the user is hosting a room
     const interval = isHostingRoom ? HOST_HEARTBEAT_INTERVAL : HEARTBEAT_INTERVAL;
     console.log(`Setting up heartbeat with interval ${interval}ms (isHost: ${isHostingRoom})`);
@@ -114,6 +136,7 @@ export const SocketProvider = ({ children }) => {
     // Send heartbeat at the appropriate interval
     heartbeatIntervalRef.current = setInterval(() => {
       if (socket.connected) {
+        // Send heartbeat without an acknowledgment callback
         socket.emit('heartbeat');
         console.log(`Sending heartbeat (isHost: ${isHostingRoom})`);
       } else {
@@ -129,8 +152,11 @@ export const SocketProvider = ({ children }) => {
         clearInterval(heartbeatIntervalRef.current);
         heartbeatIntervalRef.current = null;
       }
+      
+      // Remove heartbeat acknowledgment listener
+      socket.off('heartbeat_ack');
     };
-  }, [socket, connected, isHostingRoom]); // Added isHostingRoom as a dependency
+  }, [socket, connected, isHostingRoom]);
 
   // Update socket auth when username changes
   useEffect(() => {

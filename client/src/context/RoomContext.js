@@ -119,16 +119,81 @@ export const RoomProvider = ({ children }) => {
 
     // Race update event
     socket.on('race_update', ({ updates }) => {
-      setRaceData((prevData) => ({
-        ...prevData,
-        progress: {
-          ...prevData.progress,
-          ...updates
-        },
-        currentStep: Math.max(
-          ...Object.values(updates).map((u) => u.currentStep)
-        )
-      }));
+      setRaceData((prevData) => {
+        // Create a new progress object starting with previous data
+        const newProgress = { ...prevData.progress };
+        
+        // For all algorithms that are not in the current update, clear their lastOperation
+        Object.keys(newProgress).forEach(algo => {
+          if (!updates[algo] && newProgress[algo]) {
+            console.log(`Clearing highlight for ${algo}`);
+            newProgress[algo] = {
+              ...newProgress[algo],
+              lastOperation: null // Clear the highlighting
+            };
+          }
+        });
+        
+        // Process each algorithm update with special handling for repeated operation types
+        const processedUpdates = {};
+        
+        Object.entries(updates).forEach(([algo, update]) => {
+          const currentAlgo = newProgress[algo] || {};
+          const currentOperation = currentAlgo.lastOperation;
+          const newOperation = update.lastOperation;
+          
+          // If there's a new operation for this algorithm
+          if (newOperation) {
+            // Check if it's the same type as the previous operation
+            const isSameOperationType = 
+              currentOperation && 
+              newOperation.type === currentOperation.type &&
+              JSON.stringify(newOperation.indices) !== JSON.stringify(currentOperation.indices);
+            
+            // If same operation type but different indices, add alternating flag
+            if (isSameOperationType) {
+              console.log(`${algo}: Same operation type (${newOperation.type}), alternating highlight`);
+              
+              // Toggle the alternating flag or set it if it doesn't exist
+              const alternateFlag = currentOperation.alternate ? !currentOperation.alternate : true;
+              
+              processedUpdates[algo] = {
+                ...update,
+                lastOperation: {
+                  ...newOperation,
+                  alternate: alternateFlag
+                }
+              };
+            } else {
+              // Different operation type, reset the alternating flag
+              console.log(`${algo}: New operation type (${newOperation.type})`);
+              processedUpdates[algo] = {
+                ...update,
+                lastOperation: {
+                  ...newOperation,
+                  alternate: false
+                }
+              };
+            }
+          } else {
+            // No operation, just pass through the update
+            processedUpdates[algo] = update;
+          }
+        });
+        
+        // Now add the processed updates
+        return {
+          ...prevData,
+          progress: {
+            ...newProgress,
+            ...processedUpdates
+          },
+          currentStep: Math.max(
+            ...Object.values(updates).map(u => u.currentStep),
+            prevData.currentStep || 0
+          )
+        };
+      });
     });
 
     // Algorithm finished event

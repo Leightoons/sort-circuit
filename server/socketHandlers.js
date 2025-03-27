@@ -144,8 +144,13 @@ const registerSocketHandlers = (io) => {
       
       lastHeartbeats.set(socket.id, now);
       
-      // Send heartbeat acknowledgment back to client
-      socket.emit('heartbeat_ack');
+      // Use setTimeout to avoid potential ACK conflicts
+      setTimeout(() => {
+        // Only send acknowledgment if socket is still connected
+        if (socket.connected) {
+          socket.emit('heartbeat_ack');
+        }
+      }, 10);
     });
     
     // Handle room joining
