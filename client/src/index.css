@@ -573,6 +573,12 @@ p {
   border-radius: 4px;
   text-align: center;
   font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.connection-status:hover {
+  opacity: 0.9;
 }
 
 .connection-status.connected {
@@ -582,9 +588,69 @@ p {
 }
 
 .connection-status.disconnected {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.connection-status.reconnecting {
   background-color: rgba(255, 143, 0, 0.1);
   color: var(--color-warning);
   border: 1px solid var(--color-warning);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.connected .status-dot {
+  background-color: var(--color-success);
+  box-shadow: 0 0 5px var(--color-success);
+}
+
+.disconnected .status-dot {
+  background-color: var(--color-danger);
+  box-shadow: 0 0 5px var(--color-danger);
+}
+
+.reconnecting .status-dot {
+  background-color: var(--color-warning);
+  box-shadow: 0 0 5px var(--color-warning);
+  animation: pulse 1.5s infinite;
+}
+
+.connection-details {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.connection-details p {
+  margin: 0.25rem 0;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
 }
 
 /* Responsive adjustments */

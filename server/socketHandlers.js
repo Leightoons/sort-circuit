@@ -10,6 +10,11 @@ const lastHeartbeats = new Map();
 // Store usernames by socket ID
 const socketUsernames = new Map();
 
+// Heartbeat configuration
+const HEARTBEAT_PING_INTERVAL = 15000; // 15 seconds (client ping interval)
+const HEARTBEAT_CHECK_INTERVAL = 20000; // 20 seconds (server check interval)
+const HEARTBEAT_TIMEOUT = 60000; // 60 seconds (timeout for inactive sockets)
+
 // Helper function to normalize username (trim and convert to lowercase for comparison)
 const normalizeUsername = (username) => {
   if (!username) return '';
@@ -38,39 +43,85 @@ const registerSocketHandlers = (io) => {
   // Setup heartbeat interval to check for stale connections
   setInterval(async () => {
     const now = Date.now();
-    const HEARTBEAT_TIMEOUT = 30000; // 30 seconds timeout
+    
+    // Debug: Print all tracked heartbeats
+    console.log(`[HEARTBEAT] Checking ${lastHeartbeats.size} tracked connections`);
     
     // Check for stale connections
     for (const [socketId, lastHeartbeat] of lastHeartbeats.entries()) {
-      if (now - lastHeartbeat > HEARTBEAT_TIMEOUT) {
-        console.log(`[HEARTBEAT] Socket ${socketId} hasn't sent a heartbeat in ${HEARTBEAT_TIMEOUT}ms, considering disconnected`);
-        // Get socket instance if it exists
-        try {
-          const socket = io.sockets.sockets.get(socketId);
-          if (socket) {
-            console.log(`[HEARTBEAT] Force disconnecting socket ${socketId}`);
-            socket.disconnect(true);
-          } else {
-            // Socket not found, remove from our tracking
-            lastHeartbeats.delete(socketId);
-            socketUsernames.delete(socketId);
-          }
-        } catch (error) {
-          console.error(`[HEARTBEAT] Error handling stale connection for ${socketId}:`, error);
+      const timeSinceLastHeartbeat = now - lastHeartbeat;
+      
+      // Skip if we have a recent heartbeat
+      if (timeSinceLastHeartbeat < HEARTBEAT_TIMEOUT) {
+        continue;
+      }
+      
+      console.log(`[HEARTBEAT] Socket ${socketId} hasn't sent a heartbeat in ${timeSinceLastHeartbeat}ms (timeout: ${HEARTBEAT_TIMEOUT}ms)`);
+      
+      // Get socket instance if it exists
+      try {
+        // First check if socket is still connected to a room
+        const username = socketUsernames.get(socketId) || 'Unknown';
+        console.log(`[HEARTBEAT] Checking if ${username} (${socketId}) is still connected`);
+        
+        // Try to get the socket from the server
+        const socket = io.sockets.sockets.get(socketId);
+        
+        if (!socket) {
+          console.log(`[HEARTBEAT] Socket ${socketId} not found in io.sockets, cleaning up tracking data`);
+          // Socket not found, remove from our tracking
+          lastHeartbeats.delete(socketId);
+          // Don't remove username here, let the disconnect handler handle it
+          continue;
         }
+        
+        // Check if socket is actually connected
+        if (!socket.connected) {
+          console.log(`[HEARTBEAT] Socket ${socketId} exists but is not connected, cleaning up`);
+          lastHeartbeats.delete(socketId);
+          continue; 
+        }
+        
+        // At this point, the socket exists but hasn't sent a heartbeat in too long
+        console.log(`[HEARTBEAT] Force disconnecting socket ${socketId} (${username})`);
+        
+        // Save the notification data before disconnecting
+        const disconnectData = {
+          socketId,
+          username: socketUsernames.get(socketId)
+        };
+        
+        // Disconnect the socket
+        socket.disconnect(true);
+        
+        // Socket disconnection should trigger the disconnect event and cleanup
+      } catch (error) {
+        console.error(`[HEARTBEAT] Error handling stale connection for ${socketId}:`, error);
+        // Safety cleanup for this socket's tracking data
+        lastHeartbeats.delete(socketId);
       }
     }
-  }, 10000); // Check every 10 seconds
+  }, HEARTBEAT_CHECK_INTERVAL);
   
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id, socket.username);
     
     // Initialize heartbeat tracking
     lastHeartbeats.set(socket.id, Date.now());
+    console.log(`[HEARTBEAT] Initialized tracking for ${socket.id} (${socket.username})`);
     
     // Handle heartbeat ping
     socket.on('heartbeat', () => {
-      lastHeartbeats.set(socket.id, Date.now());
+      const now = Date.now();
+      const lastBeat = lastHeartbeats.get(socket.id) || 0;
+      const elapsed = now - lastBeat;
+      
+      // Only log occasional heartbeats to avoid log spam
+      if (elapsed > HEARTBEAT_PING_INTERVAL * 2) {
+        console.log(`[HEARTBEAT] Received from ${socket.id} (${socket.username}) after ${elapsed}ms`);
+      }
+      
+      lastHeartbeats.set(socket.id, now);
     });
     
     // Handle room joining
@@ -609,6 +660,7 @@ const registerSocketHandlers = (io) => {
       
       // Clean up heartbeat tracking
       lastHeartbeats.delete(socket.id);
+      console.log(`[HEARTBEAT] Removed tracking for ${socket.id} (${disconnectedUsername})`);
     });
   });
 };
