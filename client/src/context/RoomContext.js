@@ -21,7 +21,7 @@ export const RoomProvider = ({ children }) => {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
 
-  const { socket, connected } = useContext(SocketContext);
+  const { socket, connected, username } = useContext(SocketContext);
 
   // Listen for socket events related to rooms
   useEffect(() => {
@@ -59,8 +59,13 @@ export const RoomProvider = ({ children }) => {
     // User left room event
     socket.on('user_left', (user) => {
       setPlayers((prevPlayers) => 
-        prevPlayers.filter((p) => p.userId !== user.userId)
+        prevPlayers.filter((p) => p.socketId !== user.socketId)
       );
+    });
+
+    // Room players event
+    socket.on('room_players', ({ players: roomPlayers }) => {
+      setPlayers(roomPlayers);
     });
 
     // Algorithms updated event
@@ -164,6 +169,7 @@ export const RoomProvider = ({ children }) => {
       socket.off('room_error');
       socket.off('user_joined');
       socket.off('user_left');
+      socket.off('room_players');
       socket.off('algorithms_updated');
       socket.off('settings_updated');
       socket.off('bet_placed');
@@ -213,6 +219,7 @@ export const RoomProvider = ({ children }) => {
         allBets,
         results,
         error,
+        currentUsername: username,
         clearError,
         leaveCurrentRoom
       }}

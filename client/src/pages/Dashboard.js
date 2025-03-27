@@ -1,6 +1,5 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AuthContext from '../context/AuthContext';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
 
@@ -8,11 +7,20 @@ const Dashboard = () => {
   const [roomCode, setRoomCode] = useState('');
   const [selectedAlgorithms, setSelectedAlgorithms] = useState(['bubble', 'quick', 'merge']);
   const [joinError, setJoinError] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   
-  const { user } = useContext(AuthContext);
-  const { createRoom, joinRoom, connected } = useContext(SocketContext);
+  const { username, setUsername, createRoom, joinRoom, connected } = useContext(SocketContext);
   const { currentRoom } = useContext(RoomContext);
   const navigate = useNavigate();
+
+  // Initialize username from context or create a temporary one
+  useEffect(() => {
+    if (!username) {
+      setUsernameInput('Player');
+    } else {
+      setUsernameInput(username);
+    }
+  }, [username]);
 
   // Check if socket connected before allowing room operations
   const isReady = connected;
@@ -37,7 +45,12 @@ const Dashboard = () => {
       return;
     }
     
-    createRoom(selectedAlgorithms);
+    if (!usernameInput.trim()) {
+      setJoinError('Please enter a username');
+      return;
+    }
+    
+    createRoom(selectedAlgorithms, usernameInput);
   };
 
   // Join an existing room
@@ -54,7 +67,12 @@ const Dashboard = () => {
       return;
     }
     
-    joinRoom(roomCode);
+    if (!usernameInput.trim()) {
+      setJoinError('Please enter a username');
+      return;
+    }
+    
+    joinRoom(roomCode, usernameInput);
   };
 
   // Navigate to room page when we have a room
@@ -66,7 +84,21 @@ const Dashboard = () => {
   return (
     <div className="dashboard-page">
       <h1>Dashboard</h1>
-      <p className="lead">Welcome, {user?.username}</p>
+      <p className="lead">Create or join a room to start racing algorithms!</p>
+
+      <div className="username-section card">
+        <h3>Your Username</h3>
+        <div className="form-group">
+          <label htmlFor="username">Enter a display name to use in rooms:</label>
+          <input
+            type="text"
+            id="username"
+            value={usernameInput}
+            onChange={(e) => setUsernameInput(e.target.value)}
+            placeholder="Enter a username"
+          />
+        </div>
+      </div>
 
       <div className="dashboard-grid">
         <div className="card">
@@ -88,7 +120,7 @@ const Dashboard = () => {
             <button
               type="submit"
               className="btn btn-primary btn-block"
-              disabled={!isReady}
+              disabled={!isReady || !usernameInput.trim()}
             >
               Join Room
             </button>
@@ -157,32 +189,10 @@ const Dashboard = () => {
           <button
             onClick={handleCreateRoom}
             className="btn btn-primary btn-block"
-            disabled={!isReady || selectedAlgorithms.length < 2}
+            disabled={!isReady || selectedAlgorithms.length < 2 || !usernameInput.trim()}
           >
             Create Room
           </button>
-        </div>
-
-        <div className="card">
-          <h3>Your Stats</h3>
-          <div className="stats">
-            <div className="stat">
-              <h4>Points</h4>
-              <p>{user?.points || 0}</p>
-            </div>
-            <div className="stat">
-              <h4>Games Played</h4>
-              <p>{user?.gamesPlayed || 0}</p>
-            </div>
-            <div className="stat">
-              <h4>Win Rate</h4>
-              <p>
-                {user?.gamesPlayed > 0
-                  ? `${Math.round((user?.gamesWon / user?.gamesPlayed) * 100)}%`
-                  : '0%'}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

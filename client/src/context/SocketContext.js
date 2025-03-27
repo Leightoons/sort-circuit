@@ -1,66 +1,68 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import AuthContext from './AuthContext';
 
 const SocketContext = createContext();
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
-  const { token, isAuthenticated } = useContext(AuthContext);
+  const [username, setUsername] = useState(localStorage.getItem('username') || '');
 
-  // Create and connect socket when authenticated
+  // Create and connect socket when component mounts
   useEffect(() => {
-    if (isAuthenticated && token) {
-      // Create socket instance with token for authentication
-      const newSocket = io({
-        auth: {
-          token
-        }
-      });
+    // Create socket instance
+    const newSocket = io();
 
-      // Set up event listeners
-      newSocket.on('connect', () => {
-        console.log('Socket connected');
-        setConnected(true);
-      });
+    // Set up event listeners
+    newSocket.on('connect', () => {
+      console.log('Socket connected');
+      setConnected(true);
+    });
 
-      newSocket.on('disconnect', () => {
-        console.log('Socket disconnected');
-        setConnected(false);
-      });
-
-      newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error.message);
-        setConnected(false);
-      });
-
-      // Set socket in state
-      setSocket(newSocket);
-
-      // Clean up on unmount
-      return () => {
-        newSocket.disconnect();
-      };
-    } else if (socket) {
-      // Disconnect if no longer authenticated
-      socket.disconnect();
-      setSocket(null);
+    newSocket.on('disconnect', () => {
+      console.log('Socket disconnected');
       setConnected(false);
-    }
-  }, [isAuthenticated, token]);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+      setConnected(false);
+    });
+
+    // Set socket in state
+    setSocket(newSocket);
+
+    // Clean up on unmount
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
+
+  // Set username in storage
+  const setUsernameFn = (name) => {
+    setUsername(name);
+    localStorage.setItem('username', name);
+  };
 
   // Join a room
-  const joinRoom = (roomCode) => {
+  const joinRoom = (roomCode, playerName) => {
     if (socket && connected) {
-      socket.emit('join_room', { roomCode });
+      const name = playerName || username;
+      if (name) {
+        setUsernameFn(name);
+        socket.emit('join_room', { roomCode, username: name });
+      }
     }
   };
 
   // Create a room
-  const createRoom = (algorithms = ['bubble', 'quick', 'merge']) => {
+  const createRoom = (algorithms = ['bubble', 'quick', 'merge'], playerName) => {
     if (socket && connected) {
-      socket.emit('create_room', { algorithms });
+      const name = playerName || username;
+      if (name) {
+        setUsernameFn(name);
+        socket.emit('create_room', { algorithms, username: name });
+      }
     }
   };
 
@@ -104,6 +106,8 @@ export const SocketProvider = ({ children }) => {
       value={{
         socket,
         connected,
+        username,
+        setUsername: setUsernameFn,
         joinRoom,
         createRoom,
         placeBet,

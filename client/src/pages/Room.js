@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import AuthContext from '../context/AuthContext';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
 
@@ -8,8 +7,7 @@ const Room = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   
-  const { user } = useContext(AuthContext);
-  const { socket, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms } = useContext(SocketContext);
+  const { username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms } = useContext(SocketContext);
   const { 
     currentRoom, 
     isHost, 
@@ -390,9 +388,9 @@ const Room = () => {
         <h3>Players ({players.length})</h3>
         <ul>
           {players.map(player => (
-            <li key={player.userId} className={player.userId === user._id ? 'current-user' : ''}>
-              {player.username} {player.userId === user._id ? '(You)' : ''}
-              {isHost && player.userId === user._id && ' (Host)'}
+            <li key={player.socketId} className={player.username === username ? 'current-user' : ''}>
+              {player.username} {player.username === username ? '(You)' : ''}
+              {isHost && player.socketId === socket.id && ' (Host)'}
             </li>
           ))}
         </ul>

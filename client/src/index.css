@@ -266,6 +266,15 @@ p {
   gap: 1.5rem;
 }
 
+.username-section {
+  margin-bottom: 2rem;
+}
+
+.username-section input {
+  font-size: 1.1rem;
+  padding: 0.6rem;
+}
+
 .dashboard-page .stats {
   display: flex;
   justify-content: space-between;
