@@ -188,6 +188,8 @@ export const RoomProvider = ({ children }) => {
   const leaveCurrentRoom = () => {
     if (currentRoom && socket && connected) {
       socket.emit('leave_room', { roomCode: currentRoom });
+      
+      // Reset all room-related state
       setCurrentRoom(null);
       setIsHost(false);
       setPlayers([]);
@@ -197,6 +199,11 @@ export const RoomProvider = ({ children }) => {
       setError(null);
       setRoomStatus('waiting');
       setRaceData(null);
+      
+      // Also call SocketContext's leaveCurrentRoom to update host status
+      if (socket.leaveCurrentRoom) {
+        socket.leaveCurrentRoom();
+      }
     }
   };
 

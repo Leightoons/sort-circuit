@@ -523,7 +523,7 @@ const Room = () => {
           <button 
             className="btn btn-success start-race-btn" 
             onClick={handleStartRace}
-            disabled={allBets.length === 0 || algorithms.length < 2}
+            disabled={algorithms.length < 2}
           >
             Start Race
           </button>

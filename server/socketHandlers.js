@@ -12,8 +12,8 @@ const socketUsernames = new Map();
 
 // Heartbeat configuration
 const HEARTBEAT_PING_INTERVAL = 15000; // 15 seconds (client ping interval)
-const HEARTBEAT_CHECK_INTERVAL = 20000; // 20 seconds (server check interval)
-const HEARTBEAT_TIMEOUT = 60000; // 60 seconds (timeout for inactive sockets)
+const HEARTBEAT_CHECK_INTERVAL = 30000; // 30 seconds (server check interval)
+const HEARTBEAT_TIMEOUT = 120000; // 120 seconds (timeout for inactive sockets)
 
 // Helper function to normalize username (trim and convert to lowercase for comparison)
 const normalizeUsername = (username) => {
@@ -83,6 +83,20 @@ const registerSocketHandlers = (io) => {
         }
         
         // At this point, the socket exists but hasn't sent a heartbeat in too long
+        console.log(`[HEARTBEAT] Socket ${socketId} hasn't sent a heartbeat in ${timeSinceLastHeartbeat}ms`);
+        
+        // Check if this socket is a host in any room before disconnecting
+        const Room = getModel('Room');
+        const hostingRooms = await Room.find({ host: socketId });
+        
+        if (hostingRooms.length > 0) {
+          console.log(`[HEARTBEAT] Socket ${socketId} is hosting ${hostingRooms.length} rooms, delaying timeout`);
+          
+          // Reset heartbeat to delay timeout for hosts
+          lastHeartbeats.set(socketId, now - (HEARTBEAT_TIMEOUT / 2));
+          continue;
+        }
+        
         console.log(`[HEARTBEAT] Force disconnecting socket ${socketId} (${username})`);
         
         // Save the notification data before disconnecting
@@ -325,12 +339,23 @@ const registerSocketHandlers = (io) => {
   
         // Join the socket to the room
         console.log(`[CREATE] Joining socket to room: ${code}`);
-        socket.join(code);
+        await socket.join(code);
+        
+        // Wait a moment to ensure socket is fully joined to the room
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Verify socket was added to room
         const socketsInRoom = await io.in(code).fetchSockets();
         console.log(`[CREATE] Sockets in room ${code} after join: ${socketsInRoom.length}`);
         console.log(`[CREATE] Socket IDs in room: ${socketsInRoom.map(s => s.id).join(', ')}`);
+        
+        // If socket didn't join the room, try again
+        if (socketsInRoom.length === 0) {
+          console.log(`[CREATE] Socket didn't join room, trying again...`);
+          await socket.join(code);
+          // Wait again
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         
         console.log(`[CREATE] Emitting room_created event to client`);
         socket.emit('room_created', { 
@@ -605,12 +630,44 @@ const registerSocketHandlers = (io) => {
               }
             }
           } else {
-            // No users left, delete the room
-            console.log(`[DISCONNECT] Deleting empty room ${room.code} after host ${socket.username} disconnected`);
-            await Room.findOneAndDelete({ _id: room._id });
+            // No users left, but don't delete immediately - set a flag for pending deletion
+            console.log(`[DISCONNECT] Room ${room.code} has no active users, marking for potential deletion`);
             
-            // Clean up any active races
-            stopRace(room.code);
+            // Set a deletion flag and timestamp
+            room.pendingDeletion = true;
+            room.deletionTimestamp = Date.now();
+            await room.save();
+            
+            // Schedule a check after 10 seconds to see if anyone rejoined
+            setTimeout(async () => {
+              try {
+                // Check if room still exists
+                const checkRoom = await Room.findOne({ code: room.code });
+                if (!checkRoom) return; // Room already deleted
+                
+                // Check if it still has the deletion flag
+                if (!checkRoom.pendingDeletion) return; // Flag was removed
+                
+                // Check if anyone is in the room now
+                const currentSockets = await io.in(room.code).fetchSockets();
+                if (currentSockets.length > 0) {
+                  // Someone joined, cancel deletion
+                  console.log(`[DISCONNECT] Cancelling deletion of room ${room.code} - users are present`);
+                  checkRoom.pendingDeletion = false;
+                  await checkRoom.save();
+                  return;
+                }
+                
+                // If we reached here, the room is still empty after the delay
+                console.log(`[DISCONNECT] Deleting empty room ${room.code} after waiting period`);
+                await Room.findOneAndDelete({ _id: checkRoom._id });
+                
+                // Clean up any active races
+                stopRace(room.code);
+              } catch (err) {
+                console.error(`[DISCONNECT] Error in delayed room deletion check: ${err.message}`);
+              }
+            }, 10000); // Wait 10 seconds
           }
         }
         
@@ -676,12 +733,44 @@ const registerSocketHandlers = (io) => {
               }
             }
           } else {
-            // No users left, delete the room
-            console.log(`[DISCONNECT] Deleting empty room ${room.code} after host ${disconnectedUsername} disconnected`);
-            await Room.findOneAndDelete({ _id: room._id });
+            // No users left, but don't delete immediately - set a flag for pending deletion
+            console.log(`[DISCONNECT] Room ${room.code} has no active users, marking for potential deletion`);
             
-            // Clean up any active races
-            stopRace(room.code);
+            // Set a deletion flag and timestamp
+            room.pendingDeletion = true;
+            room.deletionTimestamp = Date.now();
+            await room.save();
+            
+            // Schedule a check after 10 seconds to see if anyone rejoined
+            setTimeout(async () => {
+              try {
+                // Check if room still exists
+                const checkRoom = await Room.findOne({ code: room.code });
+                if (!checkRoom) return; // Room already deleted
+                
+                // Check if it still has the deletion flag
+                if (!checkRoom.pendingDeletion) return; // Flag was removed
+                
+                // Check if anyone is in the room now
+                const currentSockets = await io.in(room.code).fetchSockets();
+                if (currentSockets.length > 0) {
+                  // Someone joined, cancel deletion
+                  console.log(`[DISCONNECT] Cancelling deletion of room ${room.code} - users are present`);
+                  checkRoom.pendingDeletion = false;
+                  await checkRoom.save();
+                  return;
+                }
+                
+                // If we reached here, the room is still empty after the delay
+                console.log(`[DISCONNECT] Deleting empty room ${room.code} after waiting period`);
+                await Room.findOneAndDelete({ _id: checkRoom._id });
+                
+                // Clean up any active races
+                stopRace(room.code);
+              } catch (err) {
+                console.error(`[DISCONNECT] Error in delayed room deletion check: ${err.message}`);
+              }
+            }, 10000); // Wait 10 seconds
           }
         }
         

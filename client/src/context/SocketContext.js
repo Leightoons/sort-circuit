@@ -7,11 +7,13 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [username, setUsername] = useState(localStorage.getItem('username') || '');
+  const [isHostingRoom, setIsHostingRoom] = useState(false);
   const heartbeatIntervalRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   
   // Heartbeat configuration - should match server
   const HEARTBEAT_INTERVAL = 15000; // 15 seconds
+  const HOST_HEARTBEAT_INTERVAL = 5000; // 5 seconds - more frequent for hosts
 
   // Create and connect socket when component mounts
   useEffect(() => {
@@ -20,10 +22,10 @@ export const SocketProvider = ({ children }) => {
       auth: {
         username: localStorage.getItem('username') || ''
       },
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10, // Increased from 5
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000
+      timeout: 30000 // Increased from 20000
     });
 
     // Set up event listeners
@@ -36,6 +38,9 @@ export const SocketProvider = ({ children }) => {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
+      
+      // Send immediate heartbeat on connect
+      newSocket.emit('heartbeat');
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -43,18 +48,32 @@ export const SocketProvider = ({ children }) => {
       setConnected(false);
       
       // If the server closed the connection, try to reconnect manually
-      if (reason === 'io server disconnect') {
+      if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'ping timeout') {
         // The disconnection was initiated by the server, reconnect manually
         reconnectTimeoutRef.current = setTimeout(() => {
           console.log('Attempting to reconnect...');
           newSocket.connect();
-        }, 3000);
+        }, 1000); // Try to reconnect faster
       }
     });
 
     newSocket.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       setConnected(false);
+    });
+    
+    // Listen for host assigned event to know when we become a host
+    newSocket.on('host_assigned', () => {
+      console.log('This client is now a host');
+      setIsHostingRoom(true);
+    });
+    
+    // Listen for room creation confirmation
+    newSocket.on('room_created', ({ isHost }) => {
+      if (isHost) {
+        console.log('Room created, this client is the host');
+        setIsHostingRoom(true);
+      }
     });
 
     // Set socket in state
@@ -88,15 +107,21 @@ export const SocketProvider = ({ children }) => {
     socket.emit('heartbeat');
     console.log('Sending initial heartbeat');
     
-    // Send heartbeat every HEARTBEAT_INTERVAL
+    // Choose interval based on whether the user is hosting a room
+    const interval = isHostingRoom ? HOST_HEARTBEAT_INTERVAL : HEARTBEAT_INTERVAL;
+    console.log(`Setting up heartbeat with interval ${interval}ms (isHost: ${isHostingRoom})`);
+    
+    // Send heartbeat at the appropriate interval
     heartbeatIntervalRef.current = setInterval(() => {
       if (socket.connected) {
         socket.emit('heartbeat');
-        console.log('Sending heartbeat');
+        console.log(`Sending heartbeat (isHost: ${isHostingRoom})`);
       } else {
         console.log('Socket not connected, skipping heartbeat');
+        // Try to reconnect if socket is not connected
+        socket.connect();
       }
-    }, HEARTBEAT_INTERVAL);
+    }, interval);
 
     // Clear interval on cleanup
     return () => {
@@ -105,7 +130,7 @@ export const SocketProvider = ({ children }) => {
         heartbeatIntervalRef.current = null;
       }
     };
-  }, [socket, connected]);
+  }, [socket, connected, isHostingRoom]); // Added isHostingRoom as a dependency
 
   // Update socket auth when username changes
   useEffect(() => {
@@ -117,6 +142,13 @@ export const SocketProvider = ({ children }) => {
       }
     }
   }, [username, socket, connected]);
+  
+  // Leave a room and update hosting status
+  const leaveCurrentRoom = () => {
+    if (isHostingRoom) {
+      setIsHostingRoom(false);
+    }
+  };
 
   // Set username in storage
   const setUsernameFn = (name) => {
@@ -142,6 +174,7 @@ export const SocketProvider = ({ children }) => {
       if (name) {
         setUsernameFn(name);
         socket.emit('create_room', { algorithms, username: name });
+        // Note: We don't set isHostingRoom here because we wait for the room_created event
       }
     }
   };
@@ -178,6 +211,11 @@ export const SocketProvider = ({ children }) => {
   const leaveRoom = (roomCode) => {
     if (socket && connected) {
       socket.emit('leave_room', { roomCode });
+      
+      // Reset hosting status when leaving a room
+      if (isHostingRoom) {
+        setIsHostingRoom(false);
+      }
     }
   };
 
@@ -187,6 +225,7 @@ export const SocketProvider = ({ children }) => {
         socket,
         connected,
         username,
+        isHostingRoom,
         setUsername: setUsernameFn,
         joinRoom,
         createRoom,
@@ -194,7 +233,8 @@ export const SocketProvider = ({ children }) => {
         startRace,
         updateSettings,
         selectAlgorithms,
-        leaveRoom
+        leaveRoom,
+        leaveCurrentRoom
       }}
     >
       {children}

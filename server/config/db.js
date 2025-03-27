@@ -63,6 +63,8 @@ class Room {
     this.stepSpeed = 500;
     this.createdAt = new Date();
     this.players = [];
+    this.pendingDeletion = false;
+    this.deletionTimestamp = null;
     
     // Apply supplied data over defaults
     Object.assign(this, data);
