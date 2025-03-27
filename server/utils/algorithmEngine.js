@@ -97,7 +97,9 @@ class QuickSort extends SortingAlgorithm {
     this.left = null;
     this.right = null;
     this.i = null;
+    this.j = null;
     this.state = 'start';
+    this.hasCompared = false;
   }
 
   step() {
@@ -110,6 +112,7 @@ class QuickSort extends SortingAlgorithm {
       return;
     }
     
+    // Initialize a new partition
     if (this.state === 'start') {
       [this.left, this.right] = this.stack.pop();
       
@@ -121,23 +124,65 @@ class QuickSort extends SortingAlgorithm {
       this.pivotIndex = this.right;
       this.i = this.left - 1;
       this.j = this.left;
-      this.state = 'partition';
+      this.state = 'compare';
+      this.hasCompared = false;
+      return;
     }
     
-    if (this.state === 'partition') {
+    // Compare current element with pivot
+    if (this.state === 'compare') {
       if (this.j < this.right) {
-        if (this.compare(this.pivotIndex, this.j)) {
-          this.i++;
-          this.swap(this.i, this.j);
+        if (!this.hasCompared) {
+          // Perform comparison first
+          this.compare(this.pivotIndex, this.j);
+          this.hasCompared = true;
+          return;
+        } else {
+          // Then, based on the comparison, maybe do a swap
+          if (this.lastOperation && this.lastOperation.type === 'comparison') {
+            const shouldSwap = this.dataset[this.j] < this.dataset[this.pivotIndex];
+            if (shouldSwap) {
+              this.i++;
+              this.state = 'swap';
+              return;
+            } else {
+              // No swap needed, move to next element
+              this.j++;
+              this.hasCompared = false;
+              return;
+            }
+          }
         }
-        this.j++;
       } else {
+        // Done with all elements, time to place pivot
         this.i++;
-        this.swap(this.i, this.pivotIndex);
-        this.stack.push([this.left, this.i - 1]);
-        this.stack.push([this.i + 1, this.right]);
-        this.state = 'start';
+        this.state = 'place-pivot';
+        return;
       }
+    }
+    
+    // Swap elements
+    if (this.state === 'swap') {
+      this.swap(this.i, this.j);
+      this.j++;
+      this.state = 'compare';
+      this.hasCompared = false;
+      return;
+    }
+    
+    // Place pivot in its final position
+    if (this.state === 'place-pivot') {
+      this.swap(this.i, this.pivotIndex);
+      this.state = 'push-subarrays';
+      return;
+    }
+    
+    // Push subarrays for further processing
+    if (this.state === 'push-subarrays') {
+      this.stack.push([this.left, this.i - 1]);
+      this.stack.push([this.i + 1, this.right]);
+      this.state = 'start';
+      return;
     }
   }
 }
@@ -149,7 +194,15 @@ class MergeSort extends SortingAlgorithm {
     this.auxiliaryArray = [...dataset];
     this.size = 1;
     this.leftStart = 0;
+    this.leftEnd = 0;
+    this.rightStart = 0;
+    this.rightEnd = 0;
+    this.left = 0;
+    this.right = 0;
+    this.index = 0;
     this.state = 'start';
+    this.subState = null;
+    this.copyIndex = -1;
   }
 
   step() {
@@ -162,67 +215,108 @@ class MergeSort extends SortingAlgorithm {
       return;
     }
     
+    // Setup merge operation
     if (this.state === 'start') {
       this.leftStart = 0;
-      this.state = 'merge';
+      this.state = 'setup';
+      return;
     }
     
-    if (this.state === 'merge') {
-      const leftEnd = Math.min(this.leftStart + this.size - 1, this.dataset.length - 1);
-      const rightStart = leftEnd + 1;
-      const rightEnd = Math.min(rightStart + this.size - 1, this.dataset.length - 1);
+    // Configure the merge operation
+    if (this.state === 'setup') {
+      this.leftEnd = Math.min(this.leftStart + this.size - 1, this.dataset.length - 1);
+      this.rightStart = this.leftEnd + 1;
+      this.rightEnd = Math.min(this.rightStart + this.size - 1, this.dataset.length - 1);
       
-      // Merge the two subarrays
-      let left = this.leftStart;
-      let right = rightStart;
-      let index = this.leftStart;
+      // Initialize indices for the merge
+      this.left = this.leftStart;
+      this.right = this.rightStart;
+      this.index = this.leftStart;
       
-      while (left <= leftEnd && right <= rightEnd) {
+      this.state = 'compare';
+      return;
+    }
+    
+    // Compare values from both subarrays
+    if (this.state === 'compare') {
+      if (this.left <= this.leftEnd && this.right <= this.rightEnd) {
+        // Perform one comparison
         this.comparisons++;
         this.lastOperation = {
           type: 'comparison',
-          indices: [left, right],
-          values: [this.dataset[left], this.dataset[right]]
+          indices: [this.left, this.right],
+          values: [this.dataset[this.left], this.dataset[this.right]]
         };
         
-        if (this.dataset[left] <= this.dataset[right]) {
-          this.auxiliaryArray[index] = this.dataset[left];
-          left++;
+        if (this.dataset[this.left] <= this.dataset[this.right]) {
+          this.auxiliaryArray[this.index] = this.dataset[this.left];
+          this.left++;
         } else {
-          this.auxiliaryArray[index] = this.dataset[right];
-          right++;
+          this.auxiliaryArray[this.index] = this.dataset[this.right];
+          this.right++;
         }
-        index++;
+        this.index++;
+        return;
+      } else if (this.left <= this.leftEnd) {
+        this.state = 'copy-left';
+        return;
+      } else if (this.right <= this.rightEnd) {
+        this.state = 'copy-right';
+        return;
+      } else {
+        this.state = 'copy-back';
+        this.copyIndex = this.leftStart;
+        return;
       }
+    }
+    
+    // Copy remaining left elements
+    if (this.state === 'copy-left') {
+      this.auxiliaryArray[this.index] = this.dataset[this.left];
+      this.left++;
+      this.index++;
       
-      while (left <= leftEnd) {
-        this.auxiliaryArray[index] = this.dataset[left];
-        left++;
-        index++;
+      if (this.left > this.leftEnd) {
+        this.state = this.right <= this.rightEnd ? 'copy-right' : 'copy-back';
+        this.copyIndex = this.leftStart;
       }
+      return;
+    }
+    
+    // Copy remaining right elements
+    if (this.state === 'copy-right') {
+      this.auxiliaryArray[this.index] = this.dataset[this.right];
+      this.right++;
+      this.index++;
       
-      while (right <= rightEnd) {
-        this.auxiliaryArray[index] = this.dataset[right];
-        right++;
-        index++;
+      if (this.right > this.rightEnd) {
+        this.state = 'copy-back';
+        this.copyIndex = this.leftStart;
       }
-      
-      // Copy back
-      for (let i = this.leftStart; i <= rightEnd; i++) {
-        this.dataset[i] = this.auxiliaryArray[i];
+      return;
+    }
+    
+    // Copy from auxiliary array back to main array
+    if (this.state === 'copy-back') {
+      if (this.copyIndex <= this.rightEnd) {
+        this.dataset[this.copyIndex] = this.auxiliaryArray[this.copyIndex];
         this.swaps++;
         this.lastOperation = {
           type: 'swap',
-          indices: [i, i],
-          values: [null, this.dataset[i]] // The old value is replaced
+          indices: [this.copyIndex, this.copyIndex],
+          values: [null, this.dataset[this.copyIndex]]
         };
-      }
-      
-      this.leftStart = rightEnd + 1;
-      
-      if (this.leftStart >= this.dataset.length) {
-        this.size *= 2;
-        this.state = 'start';
+        this.copyIndex++;
+        return;
+      } else {
+        this.leftStart = this.rightEnd + 1;
+        
+        if (this.leftStart >= this.dataset.length) {
+          this.size *= 2;
+          this.state = 'start';
+        } else {
+          this.state = 'setup';
+        }
       }
     }
   }
@@ -236,6 +330,7 @@ class InsertionSort extends SortingAlgorithm {
     this.j = null;
     this.key = null;
     this.state = 'start';
+    this.hasCompared = false;
   }
 
   step() {
@@ -248,38 +343,60 @@ class InsertionSort extends SortingAlgorithm {
       return;
     }
     
+    // Select the key (current element to insert)
     if (this.state === 'start') {
       this.key = this.dataset[this.i];
       this.j = this.i - 1;
-      this.state = 'shift';
+      this.state = 'compare';
+      this.hasCompared = false;
+      return;
     }
     
-    if (this.state === 'shift') {
+    // Compare current element
+    if (this.state === 'compare') {
       if (this.j >= 0) {
-        this.comparisons++;
-        this.lastOperation = {
-          type: 'comparison',
-          indices: [this.j, this.i],
-          values: [this.dataset[this.j], this.key]
-        };
-        
-        if (this.dataset[this.j] > this.key) {
-          this.dataset[this.j + 1] = this.dataset[this.j];
-          this.swaps++;
+        if (!this.hasCompared) {
+          // Perform one comparison
+          this.comparisons++;
           this.lastOperation = {
-            type: 'swap',
-            indices: [this.j, this.j + 1],
-            values: [this.dataset[this.j], this.dataset[this.j]]
+            type: 'comparison',
+            indices: [this.j, this.i],
+            values: [this.dataset[this.j], this.key]
           };
-          this.j--;
+          this.hasCompared = true;
+          return;
         } else {
-          this.state = 'insert';
+          // After comparison, decide what to do
+          if (this.dataset[this.j] > this.key) {
+            this.state = 'shift';
+            return;
+          } else {
+            this.state = 'insert';
+            return;
+          }
         }
       } else {
         this.state = 'insert';
+        return;
       }
     }
     
+    // Shift one element
+    if (this.state === 'shift') {
+      this.dataset[this.j + 1] = this.dataset[this.j];
+      this.swaps++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [this.j, this.j + 1],
+        values: [this.dataset[this.j], this.dataset[this.j]]
+      };
+      this.j--;
+      this.state = 'compare';
+      this.hasCompared = false;
+      return;
+    }
+    
+    // Insert the key
     if (this.state === 'insert') {
       this.dataset[this.j + 1] = this.key;
       this.swaps++;
@@ -290,6 +407,7 @@ class InsertionSort extends SortingAlgorithm {
       };
       this.i++;
       this.state = 'start';
+      return;
     }
   }
 }
