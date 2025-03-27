@@ -3,17 +3,12 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
-const { connectDB } = require('./config/db');
+const { initializeDatabase } = require('./config/db');
 const { registerSocketHandlers } = require('./socketHandlers');
 require('dotenv').config();
 
-// Import route files
-const authRoutes = require('./routes/auth');
-const roomRoutes = require('./routes/rooms');
-const betRoutes = require('./routes/bets');
-
-// Connect to database
-connectDB();
+// Initialize in-memory database
+initializeDatabase();
 
 // Initialize express app
 const app = express();
@@ -28,11 +23,6 @@ const io = socketIo(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Mount routes
-app.use('/api/auth', authRoutes);
-app.use('/api/rooms', roomRoutes);
-app.use('/api/rooms/:code/bets', betRoutes);
 
 // Default route
 app.get('/api', (req, res) => {

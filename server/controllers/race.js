@@ -1,6 +1,6 @@
+const { getModel } = require('../config/db');
 const { createAlgorithm, generateDataset } = require('../utils/algorithmEngine');
 const { getAllBetsForRoom, clearRoomBets } = require('./bets');
-const { getModel } = require('../config/db');
 
 // In-memory store for active races
 const activeRaces = new Map();

@@ -1,6 +1,4 @@
 const { getModel, generateRoomCode } = require('./config/db');
-const User = require('./models/User');
-const jwt = require('jsonwebtoken');
 const { startRace, getRaceStatus, stopRace } = require('./controllers/race');
 
 // Store active socket connections by user

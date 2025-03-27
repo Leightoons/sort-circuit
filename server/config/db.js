@@ -1,14 +1,9 @@
-const mongoose = require('mongoose');
-
-// Mock database in-memory when MongoDB is not available
-const mockDB = {
-  rooms: new Map(),
-  users: new Map()
+// In-memory database implementation
+const db = {
+  rooms: new Map()
 };
 
-let useMockDB = false;
-
-// Generate a random room code for mock DB
+// Generate a random room code
 const generateRoomCode = () => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
@@ -53,15 +48,16 @@ const generateDataset = (size = 20, min = 1, max = 100, allowDuplicates = false)
   return dataset;
 };
 
-// Mock model for Room
-class MockRoom {
+// Room model implementation
+class Room {
   constructor(data) {
     Object.assign(this, data);
-    this.status = 'waiting';
-    this.datasetSize = 20;
-    this.allowDuplicates = false;
-    this.valueRange = { min: 1, max: 100 };
-    this.stepSpeed = 500;
+    this.status = this.status || 'waiting';
+    this.datasetSize = this.datasetSize || 20;
+    this.allowDuplicates = this.allowDuplicates || false;
+    this.valueRange = this.valueRange || { min: 1, max: 100 };
+    this.stepSpeed = this.stepSpeed || 500;
+    this.createdAt = this.createdAt || new Date();
     
     if (!this._id) {
       this._id = Date.now().toString();
@@ -70,24 +66,24 @@ class MockRoom {
   
   static findOne(query) {
     if (query.code) {
-      return Promise.resolve(mockDB.rooms.get(query.code) || null);
+      return Promise.resolve(db.rooms.get(query.code) || null);
     }
     return Promise.resolve(null);
   }
 
   static create(data) {
-    const room = new MockRoom(data);
-    mockDB.rooms.set(data.code, room);
+    const room = new Room(data);
+    db.rooms.set(data.code, room);
     return Promise.resolve(room);
   }
 
   save() {
-    mockDB.rooms.set(this.code, this);
+    db.rooms.set(this.code, this);
     return Promise.resolve(this);
   }
   
   static findById(id) {
-    for (const [code, room] of mockDB.rooms.entries()) {
+    for (const [code, room] of db.rooms.entries()) {
       if (room._id === id) {
         return Promise.resolve(room);
       }
@@ -97,61 +93,61 @@ class MockRoom {
   
   static findOneAndDelete(query) {
     if (query.code) {
-      const room = mockDB.rooms.get(query.code);
+      const room = db.rooms.get(query.code);
       if (room) {
-        mockDB.rooms.delete(query.code);
+        db.rooms.delete(query.code);
         return Promise.resolve(room);
+      }
+    } else if (query._id) {
+      for (const [code, room] of db.rooms.entries()) {
+        if (room._id === query._id) {
+          db.rooms.delete(code);
+          return Promise.resolve(room);
+        }
       }
     }
     return Promise.resolve(null);
   }
   
-  static find(query) {
+  static find(query = {}) {
     const results = [];
-    for (const [code, room] of mockDB.rooms.entries()) {
-      if (query.host && room.host === query.host) {
+    
+    for (const [code, room] of db.rooms.entries()) {
+      let match = true;
+      
+      // Match all properties in the query
+      for (const [key, value] of Object.entries(query)) {
+        if (room[key] !== value) {
+          match = false;
+          break;
+        }
+      }
+      
+      if (match) {
         results.push(room);
       }
     }
+    
     return Promise.resolve(results);
   }
 }
 
-const connectDB = async () => {
-  try {
-    // Check if MONGO_URI is set in environment variables
-    if (!process.env.MONGO_URI) {
-      console.warn('MONGO_URI not set, using in-memory mock database');
-      useMockDB = true;
-      return;
-    }
-
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.warn(`MongoDB Connection Error: ${error.message}`);
-    console.warn('Using in-memory mock database instead');
-    useMockDB = true;
-  }
+// Simple initialization function (no actual database to connect to)
+const initializeDatabase = () => {
+  console.log('In-memory database initialized');
+  return Promise.resolve();
 };
 
-// Get the appropriate Room model (real or mock)
+// Get the appropriate model
 const getModel = (modelName) => {
-  if (useMockDB) {
-    if (modelName === 'Room') {
-      return MockRoom;
-    }
-    throw new Error(`Mock model ${modelName} not implemented`);
+  if (modelName === 'Room') {
+    return Room;
   }
-  return mongoose.model(modelName);
+  throw new Error(`Model ${modelName} not implemented`);
 };
 
 module.exports = {
-  connectDB,
+  initializeDatabase,
   getModel,
   generateRoomCode,
   generateDataset

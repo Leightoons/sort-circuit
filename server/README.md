@@ -2,17 +2,32 @@
 
 This is the backend server for the Sort Circuit application. It handles room creation, joining, and the execution of sorting algorithm races.
 
-## Important Changes
+## In-Memory Database
 
-### Model Access
-- All database models must be accessed through the `getModel()` function imported from `./config/db.js`
-- Example: `const Room = getModel('Room')` instead of directly requiring models
+The Sort Circuit server uses a simple in-memory database solution instead of MongoDB:
 
-### Mock Database
-- The application includes an in-memory mock database that activates when MongoDB is not available
-- To use the mock database, comment out the MONGO_URI in your .env file
+- No database installation or configuration required
+- All room data is stored in memory during server runtime
+- Clean and simple implementation with similar API to MongoDB models
+- Reduced dependencies and faster startup time
 
-### Room Functionality
+### Data Storage
+
+The following data is stored in-memory:
+
+- **Rooms**: Information about game rooms, their settings, and participants
+- **Active Races**: Currently running algorithm races
+- **Bets**: Player bets on algorithms
+
+Note that all data is lost when the server restarts.
+
+## Model Access
+
+- All database models are accessed through the `getModel()` function imported from `./config/db.js`
+- Example: `const Room = getModel('Room')`
+
+## Room Functionality
+
 - Rooms can be created and joined with a username
 - Socket connections maintain a list of usernames
 - Room hosts can configure algorithms and settings
@@ -28,9 +43,7 @@ This is the backend server for the Sort Circuit application. It handles room cre
 2. Create a `.env` file with:
    ```
    PORT=5000
-   # Comment this line to use in-memory database
-   # MONGO_URI=your_mongodb_uri
-   JWT_SECRET=your_secret_key
+   NODE_ENV=development
    ```
 
 3. Start the server:
@@ -42,6 +55,5 @@ This is the backend server for the Sort Circuit application. It handles room cre
 
 If you encounter issues with creating or joining rooms:
 1. Check that you're using `getModel()` for any database model access
-2. Ensure the mock database is properly initialized when MongoDB is unavailable 
-3. Check socket connection by opening browser console
-4. Verify that the server console shows the expected connection and room events 
+2. Check socket connection by opening browser console
+3. Verify that the server console shows the expected connection and room events 

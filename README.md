@@ -9,6 +9,7 @@ A multiplayer web app where players bet on races between sorting algorithms visu
 - Place bets on which algorithm will finish first
 - Customize race settings (dataset size, value range, etc.)
 - Choose which algorithms participate in each race
+- Simple in-memory data storage with no database required
 
 ## Supported Algorithms
 
@@ -24,7 +25,6 @@ A multiplayer web app where players bet on races between sorting algorithms visu
 
 - Node.js (>= 14.x)
 - npm or yarn
-- MongoDB (local or Atlas connection)
 
 ### Installation
 
@@ -41,9 +41,8 @@ A multiplayer web app where players bet on races between sorting algorithms visu
 
 3. Create a `.env` file in the root directory with the following variables:
    ```
-   MONGO_URI=your_mongodb_connection_string
    PORT=5000
-   JWT_SECRET=your_jwt_secret
+   NODE_ENV=development
    ```
 
 4. Run the development server
@@ -77,10 +76,20 @@ This will run a simple test script that creates a room and joins it.
 
 - `client/` - React frontend application
 - `server/` - Node.js/Express backend
-- `server/models/` - MongoDB schema models
+- `server/config/db.js` - In-memory database implementation
 - `server/controllers/` - Business logic
 - `server/socketHandlers.js` - WebSocket event handlers
 - `server/utils/` - Utility functions including algorithm implementations
+
+## Architecture
+
+Sort Circuit uses:
+- Socket.IO for real-time communication
+- In-memory data storage for rooms, bets, and race data
+- React for the frontend UI
+- Express for serving the API and static assets
+
+Note: Since data is stored in memory, all rooms and bets are lost when the server restarts.
 
 ## Algorithm Implementations
 
