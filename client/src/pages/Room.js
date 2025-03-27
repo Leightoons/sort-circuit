@@ -322,7 +322,8 @@ const Room = () => {
   
   // Render algorithm selection for host
   const renderAlgorithmSelector = () => {
-    if (!isHost || roomStatus !== 'waiting') return null;
+    const isUserHost = isHost || (socket && players.some(p => p.socketId === socket.id && p.isHost));
+    if (!isUserHost || roomStatus !== 'waiting') return null;
     
     return (
       <div className="algorithm-section settings-section">
@@ -385,7 +386,8 @@ const Room = () => {
   
   // Render room settings (only for host)
   const renderSettings = () => {
-    if (!isHost || roomStatus !== 'waiting') return null;
+    const isUserHost = isHost || (socket && players.some(p => p.socketId === socket.id && p.isHost));
+    if (!isUserHost || roomStatus !== 'waiting') return null;
     
     return (
       <div className="settings-section">
@@ -475,6 +477,11 @@ const Room = () => {
     return <div className="loading">Loading room...</div>;
   }
   
+  // Debug log host status
+  console.log(`Room ${roomCode} - isHost: ${isHost}, roomStatus: ${roomStatus}`);
+  console.log(`Players:`, players);
+  console.log(`Current socket ID:`, socket?.id);
+  
   return (
     <div className="room-page">
       <Notifications />
@@ -482,6 +489,7 @@ const Room = () => {
         <h1>Room: {roomCode}</h1>
         <div className="room-status">
           Status: <span className={roomStatus}>{roomStatus.charAt(0).toUpperCase() + roomStatus.slice(1)}</span>
+          {socket && <span className="host-status"> | Host: <span className={isHost ? "host-status-yes" : "host-status-no"}>{isHost ? 'Yes' : 'No'}</span></span>}
         </div>
         <button className="btn btn-danger" onClick={handleLeaveRoom}>
           Leave Room
@@ -505,7 +513,7 @@ const Room = () => {
             return (
               <li key={player.socketId} className={player.username === username ? 'current-user' : ''}>
                 {player.username} {player.username === username ? '(You)' : ''}
-                {isHost && player.socketId === socket.id && ' (Host)'}
+                {player.isHost && <span className="host-badge">(Host)</span>}
                 {hasBet && <span className="bet-indicator" title={`Has placed a bet`}>🎲</span>}
               </li>
             );
@@ -513,20 +521,24 @@ const Room = () => {
         </ul>
       </div>
       
-      {isHost && roomStatus === 'waiting' && (
+      {/* Always show host controls for the host regardless of room status */}
+      {(isHost || (socket && players.some(p => p.socketId === socket.id && p.isHost))) && (
         <div className="host-controls">
           <div className="host-notice">
             <p>
-              <i className="fas fa-info-circle"></i> As the host, you can modify algorithms and settings below. Changes will apply to the next race.
+              <i className="fas fa-info-circle"></i> As the host, you can modify algorithms and settings below. 
+              {roomStatus === 'waiting' ? ' Changes will apply to the next race.' : ' Waiting for current race to finish.'}
             </p>
           </div>
-          <button 
-            className="btn btn-success start-race-btn" 
-            onClick={handleStartRace}
-            disabled={algorithms.length < 2}
-          >
-            Start Race
-          </button>
+          {roomStatus === 'waiting' && (
+            <button 
+              className="btn btn-success start-race-btn" 
+              onClick={handleStartRace}
+              disabled={algorithms.length < 2}
+            >
+              Start Race
+            </button>
+          )}
         </div>
       )}
       

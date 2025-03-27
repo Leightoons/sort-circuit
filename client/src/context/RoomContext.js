@@ -44,8 +44,13 @@ export const RoomProvider = ({ children }) => {
     socket.on('room_joined', ({ roomCode, isHost: isRoomHost }) => {
       setCurrentRoom(roomCode);
       setRoomStatus('waiting');
+      console.log('Room joined, isHost:', isRoomHost);
       if (isRoomHost) {
         setIsHost(true);
+        console.log('Setting user as host');
+      } else {
+        setIsHost(false);
+        console.log('User is not the host');
       }
       setError(null);
     });
@@ -65,6 +70,15 @@ export const RoomProvider = ({ children }) => {
     // Room players event
     socket.on('room_players', ({ players: roomPlayers }) => {
       setPlayers(roomPlayers);
+      
+      // If we're in a room, check if we're the host based on the players list
+      if (socket) {
+        const currentPlayerData = roomPlayers.find(p => p.socketId === socket.id);
+        if (currentPlayerData && currentPlayerData.isHost) {
+          console.log('User confirmed as host via players list');
+          setIsHost(true);
+        }
+      }
     });
 
     // Algorithms updated event
@@ -163,16 +177,32 @@ export const RoomProvider = ({ children }) => {
 
     // Host assigned event
     socket.on('host_assigned', ({ roomCode }) => {
-      console.log('User has been assigned as host');
+      console.log('User has been assigned as host for room:', roomCode);
       setIsHost(true);
     });
 
     // Host changed event
     socket.on('host_changed', ({ socketId, username }) => {
+      console.log('Host changed to:', username, socketId);
+      console.log('Current socket ID:', socket.id);
+      
       // Update host status if this user is the new host
       if (socketId === socket.id) {
+        console.log('This user is now the host');
         setIsHost(true);
+      } else {
+        // If someone else became host, make sure we're not host anymore
+        console.log('Another user is now the host');
+        setIsHost(false);
       }
+      
+      // Update players list with new host information
+      setPlayers(currentPlayers => 
+        currentPlayers.map(player => ({
+          ...player,
+          isHost: player.socketId === socketId
+        }))
+      );
     });
 
     // Clean up listeners on unmount

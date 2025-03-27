@@ -121,6 +121,12 @@ const registerSocketHandlers = (io) => {
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id, socket.username);
     
+    // Track active connection
+    activeConnections.set(socket.id, {
+      username: socket.username,
+      connectedAt: Date.now()
+    });
+    
     // Initialize heartbeat tracking
     lastHeartbeats.set(socket.id, Date.now());
     console.log(`[HEARTBEAT] Initialized tracking for ${socket.id} (${socket.username})`);
@@ -220,7 +226,8 @@ const registerSocketHandlers = (io) => {
         // Add player to room if not already present
         const player = {
           socketId: socket.id,
-          username: trimmedUsername
+          username: trimmedUsername,
+          isHost: socket.id === room.host
         };
         
         // Ensure players array exists and add the player
@@ -235,21 +242,72 @@ const registerSocketHandlers = (io) => {
           await room.save();
         }
         
-        // Send room joined confirmation
-        console.log(`[JOIN] Emitting room_joined event to client with room code: ${normalizedRoomCode}`);
-        socket.emit('room_joined', { 
-          roomCode: normalizedRoomCode,
-          isHost: room.host === socket.id
-        });
+        // Check if the room needs a new host (if current host doesn't exist or is disconnected)
+        let isHostUser = socket.id === room.host;
+        
+        // If not host, check if room has a valid host
+        if (!isHostUser) {
+          const hostStillExists = room.players.some(p => p.socketId === room.host);
+          
+          console.log(`[JOIN] Current host: ${room.host}`);
+          console.log(`[JOIN] Host exists in player list: ${hostStillExists}`);
+          
+          // Check if host socket is still active or if there are no players in room
+          const connectedSockets = await io.in(normalizedRoomCode).fetchSockets();
+          console.log(`[JOIN] Connected sockets: ${connectedSockets.map(s => s.id).join(', ')}`);
+          
+          // This player should become host if:
+          // 1. There's no current host in the players list
+          // 2. The host isn't connected to the socket room
+          // 3. Room is empty (only this player) - this is the key case we're fixing
+          // 4. Host is not in active connections map
+          const hostIsConnected = hostStillExists && 
+                                 connectedSockets.some(s => s.id === room.host);
+          
+          console.log(`[JOIN] Host is connected: ${hostIsConnected}`);
+          
+          // Additional check for stale hosts
+          const hostHasActiveConnection = Array.from(activeConnections.keys()).includes(room.host);
+          console.log(`[JOIN] Host has active connection: ${hostHasActiveConnection}`);
+          
+          // Check if room is empty
+          const isRoomEmpty = connectedSockets.length <= 1; // Only this player
+          console.log(`[JOIN] Room is empty (only joining player): ${isRoomEmpty}`);
+          
+          if (!hostStillExists || !hostIsConnected || !hostHasActiveConnection || isRoomEmpty) {
+            console.log(`[JOIN] Room ${normalizedRoomCode} has no active host. Assigning new host: ${socket.id}`);
+            room.host = socket.id;
+            room.hostUsername = trimmedUsername;
+            isHostUser = true;
+            await room.save();
+            
+            // Update all players' isHost status
+            room.players.forEach(p => {
+              p.isHost = (p.socketId === socket.id);
+            });
+            await room.save();
+            
+            // Notify all users in the room about the new host
+            io.to(normalizedRoomCode).emit('host_changed', {
+              socketId: socket.id,
+              username: trimmedUsername
+            });
+          }
+        }
         
         // Get all players currently in the socket room
         const socketsInRoom = await io.in(normalizedRoomCode).fetchSockets();
         const players = socketsInRoom.map(s => ({
           socketId: s.id,
-          username: socketUsernames.get(s.id) || `Player_${s.id.substring(0, 6)}`
+          username: socketUsernames.get(s.id) || `Player_${s.id.substring(0, 6)}`,
+          isHost: s.id === room.host
         }));
         
         console.log(`[JOIN] Players in room: ${JSON.stringify(players)}`);
+        console.log(`[JOIN] Room host is: ${room.host}`);
+        console.log(`[JOIN] Current socket ID is: ${socket.id}`);
+        console.log(`[JOIN] Socket is host: ${socket.id === room.host}`);
+        console.log(`[JOIN] isHostUser: ${isHostUser}`);
         
         // Notify players in the room
         io.to(normalizedRoomCode).emit('room_players', { players });
@@ -288,6 +346,14 @@ const registerSocketHandlers = (io) => {
         }
         
         console.log(`User ${socket.username} (${socket.id}) joined room ${normalizedRoomCode}`);
+        
+        // Send room joined confirmation
+        console.log(`[JOIN] Emitting room_joined event to client with room code: ${normalizedRoomCode}`);
+        console.log(`[JOIN] User is host: ${isHostUser}`);
+        socket.emit('room_joined', { 
+          roomCode: normalizedRoomCode,
+          isHost: isHostUser
+        });
         
       } catch (error) {
         console.error('Error joining room:', error);
@@ -344,7 +410,8 @@ const registerSocketHandlers = (io) => {
           hostUsername: trimmedUsername,
           players: [{
             socketId: socket.id,
-            username: trimmedUsername
+            username: trimmedUsername,
+            isHost: true
           }],
           algorithms: algorithms
         });
@@ -362,6 +429,8 @@ const registerSocketHandlers = (io) => {
         const socketsInRoom = await io.in(code).fetchSockets();
         console.log(`[CREATE] Sockets in room ${code} after join: ${socketsInRoom.length}`);
         console.log(`[CREATE] Socket IDs in room: ${socketsInRoom.map(s => s.id).join(', ')}`);
+        console.log(`[CREATE] Room host is: ${room.host}`);
+        console.log(`[CREATE] Current socket is host: ${socket.id === room.host}`);
         
         // If socket didn't join the room, try again
         if (socketsInRoom.length === 0) {
@@ -380,7 +449,8 @@ const registerSocketHandlers = (io) => {
         // Add player to room
         const player = {
           socketId: socket.id,
-          username: trimmedUsername
+          username: trimmedUsername,
+          isHost: socket.id === room.host
         };
         
         // Emit room players update
@@ -698,6 +768,9 @@ const registerSocketHandlers = (io) => {
       const disconnectedUsername = socketUsernames.get(socket.id) || 'Unknown User';
       console.log(`Client disconnected: ${socket.id} (${disconnectedUsername})`);
       
+      // Remove from active connections
+      activeConnections.delete(socket.id);
+      
       try {
         // Find any rooms where this socket is the host
         const Room = getModel('Room');
@@ -814,8 +887,13 @@ const registerSocketHandlers = (io) => {
               });
               
               // Notify about updated player list
+              const updatedPlayers = room.players.map(p => ({
+                ...p,
+                isHost: p.socketId === room.host
+              }));
+              
               io.to(room.code).emit('room_players', { 
-                players: room.players 
+                players: updatedPlayers
               });
             } catch (saveError) {
               console.error(`[DISCONNECT] Error saving room ${room.code} after player removal: ${saveError.message}`);
