@@ -4,8 +4,17 @@ const { startRace, getRaceStatus, stopRace } = require('./controllers/race');
 // Store active socket connections by user
 const activeConnections = new Map();
 
+// Store last heartbeat time for each socket
+const lastHeartbeats = new Map();
+
 // Store usernames by socket ID
 const socketUsernames = new Map();
+
+// Helper function to normalize username (trim and convert to lowercase for comparison)
+const normalizeUsername = (username) => {
+  if (!username) return '';
+  return username.trim().toLowerCase();
+};
 
 // Authenticate socket connection
 const authenticateSocket = async (socket, next) => {
@@ -26,8 +35,43 @@ const registerSocketHandlers = (io) => {
   // Set up authentication middleware
   io.use(authenticateSocket);
   
+  // Setup heartbeat interval to check for stale connections
+  setInterval(async () => {
+    const now = Date.now();
+    const HEARTBEAT_TIMEOUT = 30000; // 30 seconds timeout
+    
+    // Check for stale connections
+    for (const [socketId, lastHeartbeat] of lastHeartbeats.entries()) {
+      if (now - lastHeartbeat > HEARTBEAT_TIMEOUT) {
+        console.log(`[HEARTBEAT] Socket ${socketId} hasn't sent a heartbeat in ${HEARTBEAT_TIMEOUT}ms, considering disconnected`);
+        // Get socket instance if it exists
+        try {
+          const socket = io.sockets.sockets.get(socketId);
+          if (socket) {
+            console.log(`[HEARTBEAT] Force disconnecting socket ${socketId}`);
+            socket.disconnect(true);
+          } else {
+            // Socket not found, remove from our tracking
+            lastHeartbeats.delete(socketId);
+            socketUsernames.delete(socketId);
+          }
+        } catch (error) {
+          console.error(`[HEARTBEAT] Error handling stale connection for ${socketId}:`, error);
+        }
+      }
+    }
+  }, 10000); // Check every 10 seconds
+  
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id, socket.username);
+    
+    // Initialize heartbeat tracking
+    lastHeartbeats.set(socket.id, Date.now());
+    
+    // Handle heartbeat ping
+    socket.on('heartbeat', () => {
+      lastHeartbeats.set(socket.id, Date.now());
+    });
     
     // Handle room joining
     socket.on('join_room', async ({ roomCode, username }) => {
@@ -41,16 +85,22 @@ const registerSocketHandlers = (io) => {
           return;
         }
 
+        // Validate username
+        if (!username || !username.trim()) {
+          console.log(`[JOIN] Error: Username is required`);
+          socket.emit('room_error', { message: 'Username is required' });
+          return;
+        }
+
         // Normalize room code to uppercase
         const normalizedRoomCode = roomCode.trim().toUpperCase();
         console.log(`[JOIN] Normalized room code: ${normalizedRoomCode}`);
         
         // Update username if provided
-        if (username) {
-          socket.username = username;
-          socketUsernames.set(socket.id, username);
-          console.log(`[JOIN] Updated username to: ${username} for socket: ${socket.id}`);
-        }
+        const trimmedUsername = username.trim();
+        socket.username = trimmedUsername;
+        socketUsernames.set(socket.id, trimmedUsername);
+        console.log(`[JOIN] Updated username to: ${trimmedUsername} for socket: ${socket.id}`);
         
         const Room = getModel('Room');
         console.log(`[JOIN] Looking for room with code: ${normalizedRoomCode}`);
@@ -60,9 +110,37 @@ const registerSocketHandlers = (io) => {
         
         const room = await Room.findOne({ code: normalizedRoomCode });
         
+        // Check if room exists
         if (!room) {
           console.log(`[JOIN] Error: Room not found with code: ${normalizedRoomCode}`);
           socket.emit('room_error', { message: 'Room not found with code: ' + normalizedRoomCode });
+          return;
+        }
+
+        // Check if room is already racing and not allowing late joins
+        if (room.status === 'racing') {
+          console.log(`[JOIN] Error: Room ${normalizedRoomCode} is already racing`);
+          socket.emit('room_error', { message: 'This room is already racing. Please wait until the race is finished.' });
+          return;
+        }
+
+        // Check if room is at capacity (optional: can implement a max player limit)
+        const MAX_PLAYERS = 10; // Set a reasonable maximum
+        if (room.players.length >= MAX_PLAYERS) {
+          console.log(`[JOIN] Error: Room ${normalizedRoomCode} is at max capacity (${MAX_PLAYERS} players)`);
+          socket.emit('room_error', { message: `This room is full (maximum ${MAX_PLAYERS} players)` });
+          return;
+        }
+
+        // Check for duplicate username in this room
+        const normalizedInputUsername = normalizeUsername(trimmedUsername);
+        const duplicateUser = room.players.find(p => 
+          normalizeUsername(p.username) === normalizedInputUsername && p.socketId !== socket.id
+        );
+        
+        if (duplicateUser) {
+          console.log(`[JOIN] Error: Username ${trimmedUsername} is already taken in room ${normalizedRoomCode}`);
+          socket.emit('room_error', { message: `Username "${trimmedUsername}" is already taken in this room` });
           return;
         }
         
@@ -73,7 +151,7 @@ const registerSocketHandlers = (io) => {
         // Add player to room if not already present
         const player = {
           socketId: socket.id,
-          username: socket.username
+          username: trimmedUsername
         };
         
         // Ensure players array exists and add the player
@@ -150,12 +228,18 @@ const registerSocketHandlers = (io) => {
           return;
         }
         
-        // Update username if provided
-        if (username) {
-          socket.username = username;
-          socketUsernames.set(socket.id, username);
-          console.log(`[CREATE] Updated username to: ${username} for socket: ${socket.id}`);
+        // Validate username
+        if (!username || !username.trim()) {
+          console.log(`[CREATE] Error: Username is required`);
+          socket.emit('room_error', { message: 'Username is required' });
+          return;
         }
+        
+        // Update username if provided
+        const trimmedUsername = username.trim();
+        socket.username = trimmedUsername;
+        socketUsernames.set(socket.id, trimmedUsername);
+        console.log(`[CREATE] Updated username to: ${trimmedUsername} for socket: ${socket.id}`);
         
         // Generate a unique room code
         let code;
@@ -178,10 +262,10 @@ const registerSocketHandlers = (io) => {
         const room = await Room.create({
           code,
           host: socket.id,
-          hostUsername: socket.username,
+          hostUsername: trimmedUsername,
           players: [{
             socketId: socket.id,
-            username: socket.username
+            username: trimmedUsername
           }],
           algorithms: algorithms
         });
@@ -199,7 +283,7 @@ const registerSocketHandlers = (io) => {
         // Add player to room
         const player = {
           socketId: socket.id,
-          username: socket.username
+          username: trimmedUsername
         };
         
         // Emit room players update
@@ -224,7 +308,7 @@ const registerSocketHandlers = (io) => {
           }
         });
         
-        console.log(`User ${socket.username} (${socket.id}) created room ${code}`);
+        console.log(`User ${trimmedUsername} (${socket.id}) created room ${code}`);
         
       } catch (error) {
         console.error('Error creating room:', error);
@@ -451,22 +535,24 @@ const registerSocketHandlers = (io) => {
     
     // Handle disconnection
     socket.on('disconnect', async () => {
-      console.log('Client disconnected:', socket.id);
+      const disconnectedUsername = socketUsernames.get(socket.id) || 'Unknown User';
+      console.log(`Client disconnected: ${socket.id} (${disconnectedUsername})`);
       
       try {
-        // Find any rooms where this socket is a member
+        // Find any rooms where this socket is the host
         const Room = getModel('Room');
-        const rooms = await Room.find({ host: socket.id });
+        const hostedRooms = await Room.find({ host: socket.id });
         
-        for (const room of rooms) {
+        for (const room of hostedRooms) {
           // Get all sockets in the room
           const socketsInRoom = await io.in(room.code).fetchSockets();
           
           if (socketsInRoom.length > 0) {
             // Assign a new host
             const newHostSocket = socketsInRoom[0];
+            const newHostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
             room.host = newHostSocket.id;
-            room.hostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
+            room.hostUsername = newHostUsername;
             await room.save();
             
             // Notify the new host
@@ -475,10 +561,13 @@ const registerSocketHandlers = (io) => {
             // Notify all users in the room about the new host
             io.to(room.code).emit('host_changed', {
               socketId: newHostSocket.id,
-              username: socketUsernames.get(newHostSocket.id) || 'New Host'
+              username: newHostUsername
             });
+
+            console.log(`[DISCONNECT] Reassigned host in room ${room.code} from ${disconnectedUsername} to ${newHostUsername}`);
           } else {
             // No users left, delete the room
+            console.log(`[DISCONNECT] Deleting empty room ${room.code} after host ${disconnectedUsername} disconnected`);
             await Room.findOneAndDelete({ _id: room._id });
             
             // Clean up any active races
@@ -486,13 +575,28 @@ const registerSocketHandlers = (io) => {
           }
         }
         
-        // Notify all rooms this socket was in about the disconnect
-        const joinedRooms = Array.from(socket.rooms);
-        for (const roomId of joinedRooms) {
-          if (roomId !== socket.id) { // Skip the default room (socket.id)
-            io.to(roomId).emit('user_left', {
+        // Find all rooms this socket was in (as a player, not just host)
+        const allRooms = await Room.find();
+        for (const room of allRooms) {
+          const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
+          
+          if (playerIndex !== -1) {
+            const playerUsername = room.players[playerIndex].username;
+            console.log(`[DISCONNECT] Removing player ${playerUsername} from room ${room.code}`);
+            
+            // Remove player from room
+            room.players.splice(playerIndex, 1);
+            await room.save();
+            
+            // Notify remaining players
+            io.to(room.code).emit('user_left', {
               socketId: socket.id,
-              username: socketUsernames.get(socket.id) || 'Unknown User'
+              username: playerUsername
+            });
+            
+            // Notify about updated player list
+            io.to(room.code).emit('room_players', { 
+              players: room.players 
             });
           }
         }
@@ -502,6 +606,9 @@ const registerSocketHandlers = (io) => {
       } catch (error) {
         console.error('Error handling disconnection:', error);
       }
+      
+      // Clean up heartbeat tracking
+      lastHeartbeats.delete(socket.id);
     });
   });
 };

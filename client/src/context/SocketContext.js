@@ -42,6 +42,20 @@ export const SocketProvider = ({ children }) => {
     };
   }, []);
 
+  // Setup heartbeat to keep connection alive
+  useEffect(() => {
+    if (!socket || !connected) return;
+
+    // Send heartbeat every 10 seconds
+    const heartbeatInterval = setInterval(() => {
+      socket.emit('heartbeat');
+    }, 10000);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+    };
+  }, [socket, connected]);
+
   // Update socket auth when username changes
   useEffect(() => {
     if (socket) {
