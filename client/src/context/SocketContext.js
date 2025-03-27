@@ -10,8 +10,12 @@ export const SocketProvider = ({ children }) => {
 
   // Create and connect socket when component mounts
   useEffect(() => {
-    // Create socket instance
-    const newSocket = io();
+    // Create socket instance with username for authentication
+    const newSocket = io({
+      auth: {
+        username: localStorage.getItem('username') || ''
+      }
+    });
 
     // Set up event listeners
     newSocket.on('connect', () => {
@@ -37,6 +41,17 @@ export const SocketProvider = ({ children }) => {
       newSocket.disconnect();
     };
   }, []);
+
+  // Update socket auth when username changes
+  useEffect(() => {
+    if (socket) {
+      socket.auth = { username };
+      // If already connected, no need to reconnect
+      if (!connected) {
+        socket.connect();
+      }
+    }
+  }, [username, socket, connected]);
 
   // Set username in storage
   const setUsernameFn = (name) => {

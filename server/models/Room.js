@@ -9,13 +9,22 @@ const RoomSchema = new mongoose.Schema({
     maxlength: [6, 'Room code cannot be more than 6 characters']
   },
   host: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
+    type: String,
+    required: true
+  },
+  hostUsername: {
+    type: String,
     required: true
   },
   players: [{
-    type: mongoose.Schema.ObjectId,
-    ref: 'User'
+    socketId: {
+      type: String,
+      required: true
+    },
+    username: {
+      type: String,
+      required: true
+    }
   }],
   status: {
     type: String,

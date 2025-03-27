@@ -6,36 +6,22 @@ const { startRace, getRaceStatus, stopRace } = require('./controllers/race');
 // Store active socket connections by user
 const activeConnections = new Map();
 
-// Authenticate socket connection using JWT
+// Store usernames by socket ID
+const socketUsernames = new Map();
+
+// Authenticate socket connection
 const authenticateSocket = async (socket, next) => {
-  const token = socket.handshake.auth.token;
-
-  if (!token) {
-    return next(new Error('Authentication error'));
+  // With username-based auth, we just need a username
+  if (socket.handshake.auth.username) {
+    socket.username = socket.handshake.auth.username;
+    socketUsernames.set(socket.id, socket.username);
+    return next();
   }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-
-    if (!user) {
-      return next(new Error('User not found'));
-    }
-
-    // Attach user to socket
-    socket.user = user;
-    socket.userId = user._id.toString();
-    
-    // Add to active connections
-    if (!activeConnections.has(user._id.toString())) {
-      activeConnections.set(user._id.toString(), new Set());
-    }
-    activeConnections.get(user._id.toString()).add(socket.id);
-    
-    next();
-  } catch (error) {
-    return next(new Error('Authentication error'));
-  }
+  
+  // If no username, generate a temporary one
+  socket.username = `Player_${socket.id.substring(0, 6)}`;
+  socketUsernames.set(socket.id, socket.username);
+  next();
 };
 
 const registerSocketHandlers = (io) => {
@@ -43,11 +29,17 @@ const registerSocketHandlers = (io) => {
   io.use(authenticateSocket);
   
   io.on('connection', (socket) => {
-    console.log('New authenticated client connected:', socket.id, socket.userId);
+    console.log('New client connected:', socket.id, socket.username);
     
     // Handle room joining
-    socket.on('join_room', async ({ roomCode }) => {
+    socket.on('join_room', async ({ roomCode, username }) => {
       try {
+        // Update username if provided
+        if (username) {
+          socket.username = username;
+          socketUsernames.set(socket.id, username);
+        }
+        
         const room = await Room.findOne({ code: roomCode });
         
         if (!room) {
@@ -55,31 +47,41 @@ const registerSocketHandlers = (io) => {
           return;
         }
         
-        // Check if user is in the room's player list
-        const isPlayerInRoom = room.players.some(
-          player => player.toString() === socket.userId
-        );
-        
-        if (!isPlayerInRoom) {
-          socket.emit('room_error', { message: 'You are not a player in this room' });
-          return;
-        }
-        
         // Join the socket to the room
         socket.join(roomCode);
         
+        // Add player to room if not already present
+        const player = {
+          socketId: socket.id,
+          username: socket.username
+        };
+        
+        // Send room joined confirmation
         socket.emit('room_joined', { roomCode });
         
-        // Notify other users in the room
-        socket.to(roomCode).emit('user_joined', {
-          userId: socket.userId,
-          username: socket.user.username
-        });
+        // Get all players currently in the socket room
+        const socketsInRoom = await io.in(roomCode).fetchSockets();
+        const players = socketsInRoom.map(s => ({
+          socketId: s.id,
+          username: socketUsernames.get(s.id) || `Player_${s.id.substring(0, 6)}`
+        }));
+        
+        // Notify players in the room
+        io.to(roomCode).emit('room_players', { players });
+        
+        // Notify other users in the room about the new user
+        socket.to(roomCode).emit('user_joined', player);
         
         // Send current race status if race is in progress
         const raceStatus = getRaceStatus(roomCode);
         if (raceStatus.exists) {
           socket.emit('race_status', raceStatus);
+        } else {
+          // Send current algorithms
+          socket.emit('algorithms_updated', {
+            roomCode,
+            algorithms: room.algorithms
+          });
         }
         
       } catch (error) {
@@ -89,24 +91,31 @@ const registerSocketHandlers = (io) => {
     });
     
     // Handle room creation
-    socket.on('create_room', async (data) => {
+    socket.on('create_room', async ({ algorithms = ['bubble', 'quick', 'merge'], username }) => {
       try {
+        // Update username if provided
+        if (username) {
+          socket.username = username;
+          socketUsernames.set(socket.id, username);
+        }
+        
         // Generate a unique room code
         let code;
         let isUnique = false;
   
         while (!isUnique) {
-          code = Room.generateRoomCode();
+          code = generateRoomCode();
           const existingRoom = await Room.findOne({ code });
           isUnique = !existingRoom;
         }
   
-        // Create room with default algorithms selected
+        // Create room with selected algorithms
         const room = await Room.create({
           code,
-          host: socket.userId,
-          players: [socket.userId],
-          algorithms: data.algorithms || ['bubble', 'quick', 'merge']
+          host: socket.id,
+          hostUsername: socket.username,
+          players: [],
+          algorithms: algorithms
         });
   
         // Join the socket to the room
@@ -115,6 +124,23 @@ const registerSocketHandlers = (io) => {
         socket.emit('room_created', { 
           roomCode: code,
           isHost: true
+        });
+        
+        // Add player to room
+        const player = {
+          socketId: socket.id,
+          username: socket.username
+        };
+        
+        // Emit room players update
+        io.to(code).emit('room_players', { 
+          players: [player]
+        });
+        
+        // Send algorithms to client
+        socket.emit('algorithms_updated', {
+          roomCode: code,
+          algorithms
         });
         
       } catch (error) {
@@ -134,8 +160,27 @@ const registerSocketHandlers = (io) => {
         }
         
         // Check if user is the host
-        if (room.host.toString() !== socket.userId) {
+        if (room.host !== socket.id) {
           socket.emit('room_error', { message: 'Only host can select algorithms' });
+          return;
+        }
+        
+        // Check if room is not racing
+        if (room.status === 'racing') {
+          socket.emit('room_error', { message: 'Cannot change algorithms during a race' });
+          return;
+        }
+        
+        // Validate algorithms (must have at least 2)
+        if (!algorithms || !Array.isArray(algorithms) || algorithms.length < 2) {
+          socket.emit('room_error', { message: 'Must select at least 2 algorithms' });
+          return;
+        }
+        
+        // Validate algorithm types
+        const validAlgorithms = ['bubble', 'quick', 'merge', 'insertion', 'selection'];
+        if (!algorithms.every(algo => validAlgorithms.includes(algo))) {
+          socket.emit('room_error', { message: 'Invalid algorithm selection' });
           return;
         }
         
@@ -177,13 +222,10 @@ const registerSocketHandlers = (io) => {
           return;
         }
         
-        // Store bet (handled by bet controller through socket.request)
-        socket.request = { user: socket.user, params: { code: roomCode }, body: { algorithm } };
-        
         // Broadcast bet to all users in the room
         io.to(roomCode).emit('bet_placed', {
-          userId: socket.userId,
-          username: socket.user.username,
+          socketId: socket.id,
+          username: socket.username,
           algorithm
         });
         
@@ -198,7 +240,25 @@ const registerSocketHandlers = (io) => {
     // Handle race start
     socket.on('start_race', async ({ roomCode }) => {
       try {
-        await startRace(io, socket, roomCode);
+        const room = await Room.findOne({ code: roomCode });
+        
+        if (!room) {
+          socket.emit('race_error', { message: 'Room not found' });
+          return;
+        }
+        
+        // Check if user is the host
+        if (room.host !== socket.id) {
+          socket.emit('race_error', { message: 'Only host can start the race' });
+          return;
+        }
+        
+        // Update room status
+        room.status = 'racing';
+        await room.save();
+        
+        // Start race
+        await startRace(io, socket, roomCode, room);
       } catch (error) {
         console.error('Error starting race:', error);
         socket.emit('race_error', { message: 'Server error' });
@@ -216,8 +276,14 @@ const registerSocketHandlers = (io) => {
         }
         
         // Check if user is the host
-        if (room.host.toString() !== socket.userId) {
+        if (room.host !== socket.id) {
           socket.emit('room_error', { message: 'Only host can update settings' });
+          return;
+        }
+        
+        // Check if room is not racing
+        if (room.status === 'racing') {
+          socket.emit('room_error', { message: 'Cannot change settings during a race' });
           return;
         }
         
@@ -256,9 +322,39 @@ const registerSocketHandlers = (io) => {
         
         // Notify other users in the room
         socket.to(roomCode).emit('user_left', {
-          userId: socket.userId,
-          username: socket.user.username
+          socketId: socket.id,
+          username: socket.username
         });
+        
+        // If host is leaving, assign new host or close room
+        const room = await Room.findOne({ code: roomCode });
+        if (room && room.host === socket.id) {
+          // Get all sockets in the room
+          const socketsInRoom = await io.in(roomCode).fetchSockets();
+          
+          if (socketsInRoom.length > 0) {
+            // Assign a new host
+            const newHostSocket = socketsInRoom[0];
+            room.host = newHostSocket.id;
+            room.hostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
+            await room.save();
+            
+            // Notify the new host
+            io.to(newHostSocket.id).emit('host_assigned', { roomCode });
+            
+            // Notify all users in the room about the new host
+            io.to(roomCode).emit('host_changed', {
+              socketId: newHostSocket.id,
+              username: socketUsernames.get(newHostSocket.id) || 'New Host'
+            });
+          } else {
+            // No users left, delete the room
+            await Room.findOneAndDelete({ code: roomCode });
+            
+            // Clean up any active races
+            stopRace(roomCode);
+          }
+        }
         
       } catch (error) {
         console.error('Error leaving room:', error);
@@ -266,21 +362,72 @@ const registerSocketHandlers = (io) => {
     });
     
     // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log('Client disconnected:', socket.id);
       
-      // Remove from active connections
-      if (socket.userId && activeConnections.has(socket.userId)) {
-        const userSockets = activeConnections.get(socket.userId);
-        userSockets.delete(socket.id);
+      try {
+        // Find any rooms where this socket is a member
+        const rooms = await Room.find({ host: socket.id });
         
-        if (userSockets.size === 0) {
-          activeConnections.delete(socket.userId);
+        for (const room of rooms) {
+          // Get all sockets in the room
+          const socketsInRoom = await io.in(room.code).fetchSockets();
+          
+          if (socketsInRoom.length > 0) {
+            // Assign a new host
+            const newHostSocket = socketsInRoom[0];
+            room.host = newHostSocket.id;
+            room.hostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
+            await room.save();
+            
+            // Notify the new host
+            io.to(newHostSocket.id).emit('host_assigned', { roomCode: room.code });
+            
+            // Notify all users in the room about the new host
+            io.to(room.code).emit('host_changed', {
+              socketId: newHostSocket.id,
+              username: socketUsernames.get(newHostSocket.id) || 'New Host'
+            });
+          } else {
+            // No users left, delete the room
+            await Room.findOneAndDelete({ _id: room._id });
+            
+            // Clean up any active races
+            stopRace(room.code);
+          }
         }
+        
+        // Notify all rooms this socket was in about the disconnect
+        const joinedRooms = Array.from(socket.rooms);
+        for (const roomId of joinedRooms) {
+          if (roomId !== socket.id) { // Skip the default room (socket.id)
+            io.to(roomId).emit('user_left', {
+              socketId: socket.id,
+              username: socketUsernames.get(socket.id) || 'Unknown User'
+            });
+          }
+        }
+        
+        // Remove from username map
+        socketUsernames.delete(socket.id);
+      } catch (error) {
+        console.error('Error handling disconnection:', error);
       }
     });
   });
 };
+
+// Helper function to generate a room code
+function generateRoomCode() {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  
+  for (let i = 0; i < 6; i++) {
+    code += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  
+  return code;
+}
 
 module.exports = {
   registerSocketHandlers

@@ -32,6 +32,34 @@ const Room = () => {
     stepSpeed: 500
   });
   
+  // State for algorithm selection
+  const [algorithmSelection, setAlgorithmSelection] = useState({
+    bubble: true,
+    quick: true,
+    merge: true,
+    insertion: false,
+    selection: false
+  });
+  
+  // Sync algorithm selection with current algorithms
+  useEffect(() => {
+    if (algorithms && algorithms.length > 0) {
+      const newSelection = {
+        bubble: false,
+        quick: false,
+        merge: false,
+        insertion: false,
+        selection: false
+      };
+      
+      algorithms.forEach(algo => {
+        newSelection[algo] = true;
+      });
+      
+      setAlgorithmSelection(newSelection);
+    }
+  }, [algorithms]);
+  
   // Join room when component mounts
   useEffect(() => {
     if (connected) {
@@ -103,6 +131,23 @@ const Room = () => {
   const handleSettingsSubmit = (e) => {
     e.preventDefault();
     updateSettings(roomCode, settingsForm);
+  };
+  
+  // Handle algorithm selection change
+  const handleAlgorithmChange = (algorithm) => {
+    const newSelection = { ...algorithmSelection, [algorithm]: !algorithmSelection[algorithm] };
+    
+    // Ensure at least 2 algorithms are selected
+    const selectedCount = Object.values(newSelection).filter(v => v).length;
+    if (selectedCount < 2) return;
+    
+    setAlgorithmSelection(newSelection);
+    
+    // Create array of selected algorithm names
+    const selectedAlgos = Object.keys(newSelection).filter(key => newSelection[key]);
+    
+    // Update algorithms on server
+    selectAlgorithms(roomCode, selectedAlgos);
   };
   
   // Render algorithm visualization
@@ -274,6 +319,69 @@ const Room = () => {
     );
   };
   
+  // Render algorithm selection for host
+  const renderAlgorithmSelector = () => {
+    if (!isHost || roomStatus !== 'waiting') return null;
+    
+    return (
+      <div className="algorithm-section settings-section">
+        <h3>Select Algorithms</h3>
+        <p>Choose which algorithms will participate in the race:</p>
+        
+        <div className="algorithm-options">
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-bubble"
+              checked={algorithmSelection.bubble}
+              onChange={() => handleAlgorithmChange('bubble')}
+            />
+            <label htmlFor="algo-bubble">Bubble Sort</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-quick"
+              checked={algorithmSelection.quick}
+              onChange={() => handleAlgorithmChange('quick')}
+            />
+            <label htmlFor="algo-quick">Quick Sort</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-merge"
+              checked={algorithmSelection.merge}
+              onChange={() => handleAlgorithmChange('merge')}
+            />
+            <label htmlFor="algo-merge">Merge Sort</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-insertion"
+              checked={algorithmSelection.insertion}
+              onChange={() => handleAlgorithmChange('insertion')}
+            />
+            <label htmlFor="algo-insertion">Insertion Sort</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-selection"
+              checked={algorithmSelection.selection}
+              onChange={() => handleAlgorithmChange('selection')}
+            />
+            <label htmlFor="algo-selection">Selection Sort</label>
+          </div>
+        </div>
+        <div className="settings-notice">
+          <small>Algorithm changes will take effect in the next race</small>
+        </div>
+      </div>
+    );
+  };
+  
   // Render room settings (only for host)
   const renderSettings = () => {
     if (!isHost || roomStatus !== 'waiting') return null;
@@ -281,6 +389,7 @@ const Room = () => {
     return (
       <div className="settings-section">
         <h3>Room Settings</h3>
+        <p>Adjust settings for the next race:</p>
         
         <form onSubmit={handleSettingsSubmit}>
           <div className="form-group">
@@ -396,19 +505,26 @@ const Room = () => {
         </ul>
       </div>
       
+      {isHost && roomStatus === 'waiting' && (
+        <div className="host-controls">
+          <div className="host-notice">
+            <p>
+              <i className="fas fa-info-circle"></i> As the host, you can modify algorithms and settings below. Changes will apply to the next race.
+            </p>
+          </div>
+          <button 
+            className="btn btn-success start-race-btn" 
+            onClick={handleStartRace}
+            disabled={allBets.length === 0 || algorithms.length < 2}
+          >
+            Start Race
+          </button>
+        </div>
+      )}
+      
       <div className="room-main">
         <div className="race-container">
           <h2>Sorting Algorithm Race</h2>
-          
-          {roomStatus === 'waiting' && isHost && (
-            <button 
-              className="btn btn-success start-race-btn" 
-              onClick={handleStartRace}
-              disabled={allBets.length === 0}
-            >
-              Start Race
-            </button>
-          )}
           
           <div className="algorithms-container">
             {algorithms.map(algo => (
@@ -421,6 +537,7 @@ const Room = () => {
         
         <div className="room-sidebar">
           {renderBetting()}
+          {renderAlgorithmSelector()}
           {renderSettings()}
           {roomStatus === 'finished' && renderResults()}
         </div>

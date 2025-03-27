@@ -1,38 +1,32 @@
 const Room = require('../models/Room');
-const User = require('../models/User');
 const { createAlgorithm, generateDataset } = require('../utils/algorithmEngine');
 const { getAllBetsForRoom, clearRoomBets } = require('./bets');
 
 // In-memory store for active races
 const activeRaces = new Map();
 
+// In-memory store for bets
+const bets = new Map();
+
 // @desc    Start a race
 // @access  Server-only
-exports.startRace = async (io, socket, roomCode) => {
+exports.startRace = async (io, socket, roomCode, room) => {
   try {
-    // Find room and update status
-    const room = await Room.findOne({ code: roomCode });
-    
     if (!room) {
-      socket.emit('race_error', { message: 'Room not found' });
-      return;
-    }
-    
-    // Check if user is the host
-    if (room.host.toString() !== socket.user.id) {
-      socket.emit('race_error', { message: 'Only host can start the race' });
-      return;
+      // Find room if not provided
+      room = await Room.findOne({ code: roomCode });
+      
+      if (!room) {
+        socket.emit('race_error', { message: 'Room not found' });
+        return;
+      }
     }
     
     // Check if race is already running
-    if (room.status === 'racing') {
+    if (activeRaces.has(roomCode)) {
       socket.emit('race_error', { message: 'Race is already in progress' });
       return;
     }
-    
-    // Update room status
-    room.status = 'racing';
-    await room.save();
     
     // Generate dataset
     const dataset = generateDataset(
@@ -56,7 +50,8 @@ exports.startRace = async (io, socket, roomCode) => {
       startTime: Date.now(),
       stepSpeed: room.stepSpeed,
       finishedAlgorithms: [],
-      raceInterval: null
+      raceInterval: null,
+      bets: getBetsForRoom(roomCode)
     });
     
     // Broadcast race start to room
@@ -149,33 +144,19 @@ const finalizeRace = async (io, roomCode) => {
     room.status = 'finished';
     await room.save();
     
-    // Get all bets for this room
-    const bets = getAllBetsForRoom(roomCode);
-    
     // Determine winner algorithm
     const winnerAlgorithm = race.finishedAlgorithms[0];
     
-    // Update user points for correct bets
-    const winningBets = bets.filter(bet => bet.algorithm === winnerAlgorithm);
+    // Find all winning bets (bets on the winning algorithm)
+    const winningBets = [];
+    const winningUsers = [];
     
-    for (const bet of winningBets) {
-      const user = await User.findById(bet.userId);
-      if (user) {
-        user.points += 1;
-        user.gamesPlayed += 1;
-        user.gamesWon += 1;
-        await user.save();
-      }
-    }
-    
-    // Update played games for losing bets
-    const losingBets = bets.filter(bet => bet.algorithm !== winnerAlgorithm);
-    
-    for (const bet of losingBets) {
-      const user = await User.findById(bet.userId);
-      if (user) {
-        user.gamesPlayed += 1;
-        await user.save();
+    for (const [betKey, bet] of bets.entries()) {
+      if (bet.roomCode === roomCode) {
+        if (bet.algorithm === winnerAlgorithm) {
+          winningBets.push(bet);
+          winningUsers.push(bet.socketId);
+        }
       }
     }
     
@@ -196,7 +177,7 @@ const finalizeRace = async (io, roomCode) => {
       roomCode,
       results,
       winnerAlgorithm,
-      winningUsers: winningBets.map(bet => bet.userId)
+      winningUsers
     });
     
     // Clean up
@@ -237,4 +218,57 @@ exports.stopRace = (roomCode) => {
     clearInterval(race.raceInterval);
     activeRaces.delete(roomCode);
   }
+};
+
+// @desc    Place a bet
+// @access  Server-only
+exports.placeBet = (socketId, username, roomCode, algorithm) => {
+  const betKey = `${roomCode}:${socketId}`;
+  
+  bets.set(betKey, {
+    socketId,
+    username,
+    roomCode,
+    algorithm,
+    timestamp: Date.now()
+  });
+  
+  return {
+    socketId,
+    username,
+    algorithm
+  };
+};
+
+// @desc    Get all bets for a room
+// @access  Server-only
+const getBetsForRoom = (roomCode) => {
+  const roomBets = [];
+  
+  for (const [key, bet] of bets.entries()) {
+    if (bet.roomCode === roomCode) {
+      roomBets.push(bet);
+    }
+  }
+  
+  return roomBets;
+};
+
+// @desc    Clear bets for a room
+// @access  Server-only
+const clearRoomBets = (roomCode) => {
+  for (const [key, bet] of bets.entries()) {
+    if (bet.roomCode === roomCode) {
+      bets.delete(key);
+    }
+  }
+};
+
+module.exports = {
+  startRace,
+  getRaceStatus,
+  stopRace,
+  placeBet,
+  getBetsForRoom,
+  clearRoomBets
 }; 
