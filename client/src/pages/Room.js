@@ -7,7 +7,7 @@ const Room = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   
-  const { username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms } = useContext(SocketContext);
+  const { socket, username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms } = useContext(SocketContext);
   const { 
     currentRoom, 
     isHost, 
