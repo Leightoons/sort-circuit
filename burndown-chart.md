@@ -71,24 +71,16 @@ This burndown chart outlines the development plan for Sort Circuit, a multiplaye
 
 ## Burndown Expectations
 
-| Week | Expected Points Remaining |
-|------|---------------------------|
-| Start | 135 |
-| Week 1 | 114 |
-| Week 2 | 93 |
-| Week 3 | 80 |
-| Week 4 | 59 |
-| Week 5 | 46 |
+| Week | Expected Points Remaining | Actual Remaining |
+|------|---------------------------|------------------|
+| Start | 135 | 135 |
+| Week 1 | 114 | 114 |
+| Week 2 | 93 | 85 |
+| Week 3 | 80 | 75 |
+| Week 4 | 59 | 70 |
+| Week 5 | 46 | 55 |
 | Week 6 | 38 |
 | Week 7 | 25 |
 | Week 8 | 12 |
 | Week 9 | 4 |
 | Week 10 | 0 |
-
-## Implementation Notes
-
-1. The project follows a front-loaded approach with heavier technical implementation in the early weeks.
-2. Story points follow a Fibonacci-like sequence (1, 2, 3, 5, 8, 13, 21) to represent complexity and effort.
-3. The core algorithm implementation and execution engine are the most complex parts of the project.
-4. Later weeks focus on user experience improvements and feature refinement.
-5. Testing is integrated throughout the development process, with dedicated time in the final week. 
