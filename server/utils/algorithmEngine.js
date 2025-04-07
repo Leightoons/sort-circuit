@@ -88,8 +88,9 @@ class SortingAlgorithm {
       indices: [i, j],
       values: [this.dataset[i], this.dataset[j]]
     };
-    
-    [this.dataset[i], this.dataset[j]] = [this.dataset[j], this.dataset[i]];
+    var temp = this.dataset[i];
+    this.dataset[i] = this.dataset[j];
+    this.dataset[j] = temp;
     
     // Wait for visualization delay
     await sleep(this.stepSpeed);
@@ -202,9 +203,11 @@ class QuickSort extends SortingAlgorithm {
               this.state = 'swap';
               return;
             } else {
-              // No swap needed, move to next element
+              // No swap needed, move to next element and perform another comparison
               this.j++;
               this.hasCompared = false;
+              await this.compare(this.pivotIndex, this.j);
+              this.hasCompared = true;
               return;
             }
           }
@@ -235,7 +238,6 @@ class QuickSort extends SortingAlgorithm {
     
     // Push subarrays for further processing
     if (this.state === 'push-subarrays') {
-
       this.stack.push([this.left, this.i - 1]);
       this.stack.push([this.i + 1, this.right]);
       
@@ -350,10 +352,9 @@ class MergeSort extends SortingAlgorithm {
       this.left++;
       this.index++;
       
-      // Always perform a swap operation
-      await this.swap(this.left - 1, this.index - 1);
+      // Record the operation without modifying the main array
       this.lastOperation = {
-        type: 'swap',
+        type: 'copy',
         indices: [this.left - 1, this.index - 1],
         values: [this.dataset[this.left - 1], this.auxiliaryArray[this.index - 1]]
       };
@@ -371,10 +372,9 @@ class MergeSort extends SortingAlgorithm {
       this.right++;
       this.index++;
       
-      // Always perform a swap operation
-      await this.swap(this.right - 1, this.index - 1);
+      // Record the operation without modifying the main array
       this.lastOperation = {
-        type: 'swap',
+        type: 'copy',
         indices: [this.right - 1, this.index - 1],
         values: [this.dataset[this.right - 1], this.auxiliaryArray[this.index - 1]]
       };
@@ -389,12 +389,12 @@ class MergeSort extends SortingAlgorithm {
     // Copy from auxiliary array back to main array
     if (this.state === 'copy-back') {
       if (this.copyIndex <= this.rightEnd) {
+        const oldValue = this.dataset[this.copyIndex];
         this.dataset[this.copyIndex] = this.auxiliaryArray[this.copyIndex];
-        await this.swap(this.copyIndex, this.copyIndex);
         this.lastOperation = {
           type: 'swap',
           indices: [this.copyIndex, this.copyIndex],
-          values: [null, this.dataset[this.copyIndex]]
+          values: [oldValue, this.dataset[this.copyIndex]]
         };
         this.copyIndex++;
         return;
