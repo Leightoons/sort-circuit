@@ -661,6 +661,49 @@ const registerSocketHandlers = (io) => {
       }
     });
     
+    // Handle reset room state
+    socket.on('reset_room_state', async ({ roomCode }) => {
+      try {
+        const Room = getModel('Room');
+        const room = await Room.findOne({ code: roomCode });
+        
+        if (!room) {
+          socket.emit('room_error', { message: 'Room not found' });
+          return;
+        }
+        
+        // Check if user is the host
+        if (room.host !== socket.id) {
+          socket.emit('room_error', { message: 'Only host can reset the room' });
+          return;
+        }
+        
+        // Only allow reset if room is in 'finished' state
+        if (room.status !== 'finished') {
+          socket.emit('room_error', { message: 'Can only reset finished races' });
+          return;
+        }
+        
+        // Update room status to waiting
+        room.status = 'waiting';
+        await room.save();
+        
+        // Clean up any race data
+        stopRace(roomCode);
+        
+        // Broadcast the room state update to all clients in the room
+        io.to(roomCode).emit('race_status', {
+          status: 'waiting',
+          algorithms: room.algorithms
+        });
+        
+        socket.emit('room_state_reset', { roomCode });
+      } catch (error) {
+        console.error('Error resetting room state:', error);
+        socket.emit('room_error', { message: 'Server error' });
+      }
+    });
+    
     // Handle room leave
     socket.on('leave_room', async ({ roomCode }) => {
       try {

@@ -17,7 +17,7 @@ const Room = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   
-  const { socket, username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms } = useContext(SocketContext);
+  const { socket, username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms, resetRoomState } = useContext(SocketContext);
   const { 
     currentRoom, 
     isHost, 
@@ -103,6 +103,11 @@ const Room = () => {
   // Handle starting race
   const handleStartRace = () => {
     startRace(roomCode);
+  };
+  
+  // Handle resetting room to waiting state
+  const handleResetRoom = () => {
+    resetRoomState(roomCode);
   };
   
   // Handle leaving room
@@ -351,7 +356,7 @@ const Room = () => {
         )}
         
         {isHost && (
-          <button className="btn btn-primary" onClick={handleStartRace}>
+          <button className="btn btn-primary" onClick={handleResetRoom}>
             Start New Race
           </button>
         )}

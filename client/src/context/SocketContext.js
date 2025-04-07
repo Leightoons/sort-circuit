@@ -232,6 +232,13 @@ export const SocketProvider = ({ children }) => {
       socket.emit('select_algorithm', { roomCode, algorithms });
     }
   };
+  
+  // Reset room state to waiting
+  const resetRoomState = (roomCode) => {
+    if (socket && connected) {
+      socket.emit('reset_room_state', { roomCode });
+    }
+  };
 
   // Leave a room
   const leaveRoom = (roomCode) => {
@@ -259,6 +266,7 @@ export const SocketProvider = ({ children }) => {
         startRace,
         updateSettings,
         selectAlgorithms,
+        resetRoomState,
         leaveRoom,
         leaveCurrentRoom
       }}
