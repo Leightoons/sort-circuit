@@ -270,26 +270,35 @@ export const RoomProvider = ({ children }) => {
       );
     });
 
+    // Bets reset event
+    socket.on('bets_reset', () => {
+      setUserBet(null);
+      setAllBets([]);
+    });
+
     // Clean up listeners on unmount
     return () => {
-      socket.off('room_created');
-      socket.off('room_joined');
-      socket.off('room_error');
-      socket.off('user_left');
-      socket.off('room_players');
-      socket.off('algorithms_updated');
-      socket.off('settings_updated');
-      socket.off('bet_placed');
-      socket.off('bet_confirmed');
-      socket.off('bet_error');
-      socket.off('race_started');
-      socket.off('race_update');
-      socket.off('algorithm_finished');
-      socket.off('race_results');
-      socket.off('race_error');
-      socket.off('race_status');
-      socket.off('host_assigned');
-      socket.off('host_changed');
+      // Clean up all socket event listeners
+      if (socket) {
+        socket.off('room_created');
+        socket.off('room_joined');
+        socket.off('room_error');
+        socket.off('user_left');
+        socket.off('room_players');
+        socket.off('algorithms_updated');
+        socket.off('settings_updated');
+        socket.off('race_start');
+        socket.off('race_update');
+        socket.off('race_results');
+        socket.off('algorithm_finished');
+        socket.off('bet_placed');
+        socket.off('bet_confirmed');
+        socket.off('race_error');
+        socket.off('race_status');
+        socket.off('host_assigned');
+        socket.off('host_changed');
+        socket.off('bets_reset');
+      }
     };
   }, [socket, connected]);
 

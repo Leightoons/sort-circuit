@@ -1,6 +1,6 @@
 const { getModel, generateRoomCode } = require('./config/db');
 const { startRace, getRaceStatus, stopRace } = require('./controllers/race');
-const { getAllBetsForRoom, placeBet } = require('./controllers/bets');
+const { getAllBetsForRoom, placeBet, clearRoomBets } = require('./controllers/bets');
 
 // Store active socket connections by user
 const activeConnections = new Map();
@@ -691,11 +691,17 @@ const registerSocketHandlers = (io) => {
         // Clean up any race data
         stopRace(roomCode);
         
+        // Clear all bets for this room
+        clearRoomBets(roomCode);
+        
         // Broadcast the room state update to all clients in the room
         io.to(roomCode).emit('race_status', {
           status: 'waiting',
           algorithms: room.algorithms
         });
+        
+        // Send a bet reset signal to all clients
+        io.to(roomCode).emit('bets_reset');
         
         socket.emit('room_state_reset', { roomCode });
       } catch (error) {

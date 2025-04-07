@@ -87,6 +87,13 @@ const Room = () => {
     setSettingsForm(settings);
   }, [settings]);
   
+  // Reset selectedAlgorithm when userBet is reset
+  useEffect(() => {
+    if (userBet === null) {
+      setSelectedAlgorithm('');
+    }
+  }, [userBet]);
+  
   // Navigate away if room code doesn't match current room
   useEffect(() => {
     if (currentRoom && currentRoom !== roomCode) {
@@ -271,7 +278,6 @@ const Room = () => {
                   value={algo}
                   checked={selectedAlgorithm === algo}
                   onChange={() => setSelectedAlgorithm(algo)}
-                  disabled={userBet !== null}
                 />
                 <label htmlFor={`bet-${algo}`}>
                   {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
@@ -282,7 +288,14 @@ const Room = () => {
         
         {userBet ? (
           <div className="betting-confirmation">
-            <p>You bet on: <strong>{userBet.charAt(0).toUpperCase() + userBet.slice(1)} Sort</strong></p>
+            <p>Your current bet: <strong>{userBet.charAt(0).toUpperCase() + userBet.slice(1)} Sort</strong></p>
+            <button 
+              className="btn btn-primary" 
+              onClick={handlePlaceBet} 
+              disabled={!selectedAlgorithm || selectedAlgorithm === userBet}
+            >
+              Change Bet
+            </button>
           </div>
         ) : (
           <button 
