@@ -418,88 +418,81 @@ class MergeSort extends SortingAlgorithm {
 class InsertionSort extends SortingAlgorithm {
   constructor(dataset, stepSpeed) {
     super(dataset, stepSpeed);
-    this.i = 1;
-    this.j = null;
-    this.key = null;
-    this.state = 'start';
-    this.hasCompared = false;
+    this.i = 1; // Start with the second element (index 1)
+    this.j = 0; // Position to compare with
+    this.key = null; // Current element being inserted
+    this.state = 'outer'; // State machine: 'outer', 'inner', 'insert'
   }
 
   async step() {
     if (this.finished) return;
     
+    // Check if we've finished processing all elements
     if (this.i >= this.dataset.length) {
       this.finished = true;
       return;
     }
     
-    // Select the key (current element to insert)
-    if (this.state === 'start') {
+    // OUTER LOOP - Select new key to insert
+    if (this.state === 'outer') {
       this.key = this.dataset[this.i];
       this.j = this.i - 1;
-      // Compare the key with previous element to ensure we perform an operation
-      if (this.j >= 0) {
-        await this.compare(this.j, this.i);
-      } else {
-        // Compare with itself if there's no previous element
-        await this.compare(this.i, this.i);
-      }
-      this.state = 'compare';
-      this.hasCompared = true;
+      
+      // Perform a comparison to visualize which element we're working with
+      await this.compare(this.i, this.i);
+      
+      this.state = 'inner';
       return;
     }
     
-    // Compare current element
-    if (this.state === 'compare') {
+    // INNER LOOP - Find insertion position and shift elements
+    if (this.state === 'inner') {
+      // Check if we need to continue the inner loop
       if (this.j >= 0) {
-        if (!this.hasCompared) {
-          // Perform one comparison
-          await this.compare(this.j, this.i);
-          this.hasCompared = true;
+        // Compare the key with the current element
+        await this.compare(this.j, this.i);
+        
+        // If current element is greater than key, shift it right
+        if (this.dataset[this.j] > this.key) {
+          this.dataset[this.j + 1] = this.dataset[this.j];
+          await this.swap(this.j, this.j + 1);
+          this.j--; // Move left to continue comparing
           return;
         } else {
-          // After comparison, decide what to do
-          if (this.dataset[this.j] > this.key) {
-            this.state = 'shift';
-            this.hasCompared = false;
-            return;
-          } else {
-            this.state = 'insert';
-            return;
-          }
+          // Found the insertion position
+          this.state = 'insert';
+          return;
         }
       } else {
+        // Reached the beginning of the array
         this.state = 'insert';
         return;
       }
     }
     
-    // Shift one element
-    if (this.state === 'shift') {
-      this.dataset[this.j + 1] = this.dataset[this.j];
-      await this.swap(this.j, this.j + 1);
-      this.lastOperation = {
-        type: 'swap',
-        indices: [this.j, this.j + 1],
-        values: [this.dataset[this.j], this.dataset[this.j]]
-      };
-      this.j--;
-      this.state = 'compare';
-      return;
-    }
-    
-    // Insert the key
+    // INSERT - Place the key at its correct position
     if (this.state === 'insert') {
-      const oldValue = this.dataset[this.j + 1];
-      this.dataset[this.j + 1] = this.key;
-      await this.swap(this.j + 1, -1);
-      this.lastOperation = {
-        type: 'swap',
-        indices: [this.j + 1, -1],
-        values: [oldValue, this.key]
-      };
+      // The position to insert is j+1
+      if (this.dataset[this.j + 1] !== this.key) {
+        const oldValue = this.dataset[this.j + 1];
+        this.dataset[this.j + 1] = this.key;
+        
+        // Visualize the insertion
+        this.lastOperation = {
+          type: 'swap',
+          indices: [this.j + 1, -1], // -1 signifies special "from key" operation
+          values: [oldValue, this.key]
+        };
+        this.swaps++;
+        this.currentStep++;
+      } else {
+        // If the key is already in the right position, still visualize it
+        await this.compare(this.j + 1, this.j + 1);
+      }
+      
+      // Move to the next element in the outer loop
       this.i++;
-      this.state = 'start';
+      this.state = 'outer';
       return;
     }
   }
