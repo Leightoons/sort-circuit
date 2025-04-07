@@ -163,13 +163,8 @@ class QuickSort extends SortingAlgorithm {
   async step() {
     if (this.finished) return;
     
-    if (this.stack.length === 0) {
-      this.finished = true;
-      return;
-    }
-    
     // Initialize a new partition
-    if (this.state === 'start') {
+    if (this.state === 'start' && this.stack.length > 0) {
       [this.left, this.right] = this.stack.pop();
       
       if (this.left >= this.right) {
@@ -240,12 +235,18 @@ class QuickSort extends SortingAlgorithm {
     
     // Push subarrays for further processing
     if (this.state === 'push-subarrays') {
+
       this.stack.push([this.left, this.i - 1]);
       this.stack.push([this.i + 1, this.right]);
       
       // Compare the pivot with itself to ensure we perform an operation
       await this.compare(this.i, this.i);
       this.state = 'start';
+      return;
+    }
+    
+    if (this.stack.length === 0) {
+      this.finished = true;
       return;
     }
   }

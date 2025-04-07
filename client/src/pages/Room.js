@@ -495,9 +495,9 @@ const Room = () => {
               type="range"
               id="stepSpeed"
               name="stepSpeed"
-              min="100"
-              max="2000"
-              step="100"
+              min="0"
+              max="500"
+              step="50"
               value={settingsForm.stepSpeed}
               onChange={handleSettingsChange}
             />
