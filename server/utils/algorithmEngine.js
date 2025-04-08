@@ -30,7 +30,10 @@ class SortingAlgorithm {
     this.isRunning = true;
     
     while (!this.finished) {
-      await this.step();
+      var lastStep = this.currentStep;
+      while (this.currentStep === lastStep) {
+        await this.step();
+      }
       await sleep(this.stepSpeed);
     }
     
@@ -74,7 +77,7 @@ class SortingAlgorithm {
     };
     
     // Wait for visualization delay
-    await sleep(this.stepSpeed);
+    //await sleep(this.stepSpeed);
     
     return this.dataset[i] > this.dataset[j];
   }
@@ -93,7 +96,7 @@ class SortingAlgorithm {
     this.dataset[j] = temp;
     
     // Wait for visualization delay
-    await sleep(this.stepSpeed);
+    //await sleep(this.stepSpeed);
   }
 }
 
@@ -483,8 +486,8 @@ class InsertionSort extends SortingAlgorithm {
           indices: [this.j + 1, -1], // -1 signifies special "from key" operation
           values: [oldValue, this.key]
         };
-        this.swaps++;
-        this.currentStep++;
+        //this.swaps++;
+        //this.currentStep++;
       } else {
         // If the key is already in the right position, still visualize it
         await this.compare(this.j + 1, this.j + 1);
