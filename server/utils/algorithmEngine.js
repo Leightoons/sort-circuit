@@ -345,9 +345,10 @@ class SelectionSort extends SortingAlgorithm {
       // Find the minimum element in the unsorted part of the array
       for (let j = i + 1; j < n; j++) {
         // Compare current element with current minimum
-        const isLess = !(await this.compare(minIndex, j));
+        const result = await this.compare(minIndex, j);
         
-        if (isLess) {
+        // If j element is smaller than current minimum
+        if (result) {
           minIndex = j;
         }
       }
