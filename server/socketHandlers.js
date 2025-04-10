@@ -367,7 +367,7 @@ const registerSocketHandlers = (io) => {
     });
     
     // Handle room creation
-    socket.on('create_room', async ({ algorithms = ['bubble', 'quick', 'merge'], username }) => {
+    socket.on('create_room', async ({ algorithms = ['bubble', 'quick', 'inplacestable'], username }) => {
       try {
         console.log(`[CREATE] Attempting to create room with algorithms: ${algorithms} and username: ${username}`);
         
@@ -518,7 +518,7 @@ const registerSocketHandlers = (io) => {
         }
         
         // Validate algorithm types
-        const validAlgorithms = ['bubble', 'quick', 'merge', 'insertion', 'selection'];
+        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'insertion', 'selection'];
         if (!algorithms.every(algo => validAlgorithms.includes(algo))) {
           socket.emit('room_error', { message: 'Invalid algorithm selection' });
           return;

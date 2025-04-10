@@ -7,7 +7,7 @@ const Home = () => {
   
   const handleTestCreateRoom = () => {
     if (connected) {
-      createRoom(['bubble', 'quick', 'merge'], 'TestUser');
+      createRoom(['bubble', 'quick', 'inplacestable'], 'TestUser');
       console.log('Test room creation initiated');
     } else {
       console.log('Not connected to server');
@@ -73,8 +73,8 @@ const Home = () => {
             <p>A divide-and-conquer algorithm that selects a 'pivot' element and partitions the array around it.</p>
           </div>
           <div className="card">
-            <h3>Merge Sort</h3>
-            <p>A divide-and-conquer algorithm that divides the input array into two halves, sorts them, and then merges the sorted halves.</p>
+            <h3>In-Place Stable Sort</h3>
+            <p>A stable sorting algorithm that works in-place without auxiliary storage, using binary search and rotations to efficiently merge sorted sections.</p>
           </div>
           <div className="card">
             <h3>Insertion Sort</h3>

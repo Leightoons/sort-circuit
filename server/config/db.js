@@ -202,7 +202,7 @@ const initializeDatabase = async () => {
           code: testRoomCode,
           host: 'test-host-id',
           hostUsername: 'TestHost',
-          algorithms: ['bubble', 'quick', 'merge'],
+          algorithms: ['bubble', 'quick', 'inplacestable'],
         });
         console.log(`[DB] Created test room: ${testRoomCode}`);
       }

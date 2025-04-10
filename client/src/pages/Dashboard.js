@@ -5,7 +5,7 @@ import RoomContext from '../context/RoomContext';
 
 const Dashboard = () => {
   const [roomCode, setRoomCode] = useState('');
-  const [selectedAlgorithms, setSelectedAlgorithms] = useState(['bubble', 'quick', 'merge']);
+  const [selectedAlgorithms, setSelectedAlgorithms] = useState(['bubble', 'quick', 'inplacestable']);
   const [joinError, setJoinError] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -185,12 +185,12 @@ const Dashboard = () => {
               <div className="algorithm-option">
                 <input
                   type="checkbox"
-                  id="merge"
-                  name="merge"
-                  checked={selectedAlgorithms.includes('merge')}
-                  onChange={() => handleAlgorithmChange('merge')}
+                  id="inplacestable"
+                  name="inplacestable"
+                  checked={selectedAlgorithms.includes('inplacestable')}
+                  onChange={() => handleAlgorithmChange('inplacestable')}
                 />
-                <label htmlFor="merge">Merge Sort</label>
+                <label htmlFor="inplacestable">In-Place Stable Sort</label>
               </div>
               <div className="algorithm-option">
                 <input

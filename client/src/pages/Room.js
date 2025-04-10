@@ -9,7 +9,7 @@ const ALGORITHM_ORDER = {
   'bubble': 1,
   'insertion': 2,
   'selection': 3,
-  'merge': 4,
+  'inplacestable': 4,
   'quick': 5
 };
 
@@ -46,7 +46,7 @@ const Room = () => {
   const [algorithmSelection, setAlgorithmSelection] = useState({
     bubble: true,
     quick: true,
-    merge: true,
+    inplacestable: true,
     insertion: false,
     selection: false
   });
@@ -57,7 +57,7 @@ const Room = () => {
       const newSelection = {
         bubble: false,
         quick: false,
-        merge: false,
+        inplacestable: false,
         insertion: false,
         selection: false
       };
@@ -409,11 +409,11 @@ const Room = () => {
           <div className="algorithm-option">
             <input
               type="checkbox"
-              id="algo-merge"
-              checked={algorithmSelection.merge}
-              onChange={() => handleAlgorithmChange('merge')}
+              id="algo-inplacestable"
+              checked={algorithmSelection.inplacestable}
+              onChange={() => handleAlgorithmChange('inplacestable')}
             />
-            <label htmlFor="algo-merge">Merge Sort</label>
+            <label htmlFor="algo-inplacestable">In-Place Stable Sort</label>
           </div>
           <div className="algorithm-option">
             <input

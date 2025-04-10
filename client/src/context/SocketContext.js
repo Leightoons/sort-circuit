@@ -194,7 +194,7 @@ export const SocketProvider = ({ children }) => {
   };
 
   // Create a room
-  const createRoom = (algorithms = ['bubble', 'quick', 'merge'], playerName) => {
+  const createRoom = (algorithms = ['bubble', 'quick', 'inplacestable'], playerName) => {
     if (socket && connected) {
       const name = playerName || username;
       if (name) {

@@ -26,7 +26,7 @@ exports.createRoom = async (req, res) => {
     const room = await Room.create({
       code,
       host,
-      algorithms: algorithms || ['bubble', 'quick', 'merge']
+      algorithms: algorithms || ['bubble', 'quick', 'inplacestable']
     });
     
     // Return room details

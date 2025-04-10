@@ -168,111 +168,195 @@ class QuickSort extends SortingAlgorithm {
 }
 
 // MergeSort implementation
-class MergeSort extends SortingAlgorithm {
-  constructor(dataset, stepSpeed) {
-    super(dataset, stepSpeed);
-    this.auxiliaryArray = [...dataset];
-  }
-  
+class InPlaceStableSort extends SortingAlgorithm {
   async sort() {
-    await this.mergeSort(0, this.dataset.length - 1);
+    await this.stableSort(0, this.dataset.length);
   }
   
-  async mergeSort(left, right) {
-    if (left < right) {
-      const mid = Math.floor((left + right) / 2);
-      
-      // Sort first and second halves
-      await this.mergeSort(left, mid);
-      await this.mergeSort(mid + 1, right);
-      
-      // Merge the sorted halves
-      await this.merge(left, mid, right);
-    }
-  }
-  
-  async merge(left, mid, right) {
-    // Copy data to auxiliary arrays
-    for (let i = left; i <= right; i++) {
-      this.auxiliaryArray[i] = this.dataset[i];
-      
-      // Visualize the copying
-      this.currentStep++;
-      this.lastOperation = {
-        type: 'copy',
-        indices: [i, i],
-        values: [this.dataset[i], this.auxiliaryArray[i]]
-      };
-      await sleep(this.stepSpeed);
-    }
+  // Find the first position where value is not less than array[index]
+  async lowerBound(from, to, valueIndex) {
+    let len = to - from;
     
-    let i = left; // Initial index of first subarray
-    let j = mid + 1; // Initial index of second subarray
-    let k = left; // Initial index of merged subarray
-    
-    // Merge the arrays
-    while (i <= mid && j <= right) {
-      // Compare elements from both subarrays
-      const result = await this.compare(i, j);
+    while (len > 0) {
+      const half = Math.floor(len / 2);
+      const mid = from + half;
       
-      if (!result) {
-        // Element from left subarray is smaller
-        this.dataset[k] = this.auxiliaryArray[i];
-        i++;
+      // Compare mid with valueIndex
+      if (await this.compare(valueIndex, mid)) {
+        // valueIndex > mid, so search in right half
+        from = mid + 1;
+        len = len - half - 1;
       } else {
-        // Element from right subarray is smaller
-        this.dataset[k] = this.auxiliaryArray[j];
-        j++;
+        // valueIndex <= mid, so search in left half
+        len = half;
+      }
+    }
+    
+    return from;
+  }
+  
+  // Find the first position where value is less than array[index]
+  async upperBound(from, to, valueIndex) {
+    let len = to - from;
+    
+    while (len > 0) {
+      const half = Math.floor(len / 2);
+      const mid = from + half;
+      
+      // Compare valueIndex with mid
+      if (await this.compare(mid, valueIndex)) {
+        // mid > valueIndex, so search in left half
+        len = half;
+      } else {
+        // mid <= valueIndex, so search in right half
+        from = mid + 1;
+        len = len - half - 1;
+      }
+    }
+    
+    return from;
+  }
+  
+  // Insert sort for small arrays
+  async insertSort(from, to) {
+    if (to > from + 1) {
+      for (let i = from + 1; i < to; i++) {
+        for (let j = i; j > from; j--) {
+          if (await this.compare(j - 1, j)) {
+            await this.swap(j, j - 1);
+          } else {
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  // Greatest common divisor
+  gcd(m, n) {
+    while (n !== 0) {
+      const t = m % n;
+      m = n;
+      n = t;
+    }
+    return m;
+  }
+  
+  // Reverse a subarray
+  async reverse(from, to) {
+    while (from < to) {
+      await this.swap(from++, to--);
+    }
+  }
+  
+  // Rotate a subarray - moves elements from [from, mid) to after [mid, to)
+  async rotate(from, mid, to) {
+    if (from === mid || mid === to) return;
+    
+    // Use the algorithm from the reference site
+    const n = this.gcd(to - from, mid - from);
+    
+    for (let i = 0; i < n; i++) {
+      // Save the first element
+      const val = this.dataset[from + i];
+      const shift = mid - from;
+      
+      let p1 = from + i;
+      let p2 = from + i + shift;
+      
+      while (p2 !== from + i) {
+        // Move p2 to p1
+        this.dataset[p1] = this.dataset[p2];
+        
+        // Visualize this operation
+        this.swaps++;
+        this.currentStep++;
+        this.lastOperation = {
+          type: 'swap',
+          indices: [p1, p2],
+          values: [this.dataset[p1], this.dataset[p2]]
+        };
+        await sleep(this.stepSpeed);
+        
+        p1 = p2;
+        
+        if (to - p2 > shift) {
+          p2 += shift;
+        } else {
+          p2 = from + (shift - (to - p2));
+        }
       }
       
-      // Visualize the placement
+      // Place the saved value
+      this.dataset[p1] = val;
+      
+      // Visualize this operation
       this.swaps++;
       this.currentStep++;
       this.lastOperation = {
         type: 'swap',
-        indices: [k, k],
-        values: [this.dataset[k], this.auxiliaryArray[i-1]]
+        indices: [p1, -1],
+        values: [this.dataset[p1], val]
       };
       await sleep(this.stepSpeed);
-      
-      k++;
+    }
+  }
+  
+  // Merge two adjacent sorted subarrays
+  async merge(from, pivot, to, len1, len2) {
+    await sleep(this.stepSpeed); // Visualize the recursive structure
+    
+    if (len1 === 0 || len2 === 0) return;
+    
+    if (len1 + len2 === 2) {
+      if (await this.compare(from, pivot)) {
+        await this.swap(from, pivot);
+      }
+      return;
     }
     
-    // Copy the remaining elements of left subarray, if any
-    while (i <= mid) {
-      this.dataset[k] = this.auxiliaryArray[i];
-      
-      // Visualize the copy
-      this.swaps++;
-      this.currentStep++;
-      this.lastOperation = {
-        type: 'swap',
-        indices: [k, i],
-        values: [this.dataset[k], this.auxiliaryArray[i]]
-      };
-      await sleep(this.stepSpeed);
-      
-      i++;
-      k++;
+    let firstCut, secondCut;
+    let len11, len22;
+    
+    if (len1 > len2) {
+      len11 = Math.floor(len1 / 2);
+      firstCut = from + len11;
+      secondCut = await this.lowerBound(pivot, to, firstCut);
+      len22 = secondCut - pivot;
+    } else {
+      len22 = Math.floor(len2 / 2);
+      secondCut = pivot + len22;
+      firstCut = await this.upperBound(from, pivot, secondCut);
+      len11 = firstCut - from;
     }
     
-    // Copy the remaining elements of right subarray, if any
-    while (j <= right) {
-      this.dataset[k] = this.auxiliaryArray[j];
-      
-      // Visualize the copy
-      this.swaps++;
-      this.currentStep++;
-      this.lastOperation = {
-        type: 'swap',
-        indices: [k, j],
-        values: [this.dataset[k], this.auxiliaryArray[j]]
-      };
-      await sleep(this.stepSpeed);
-      
-      j++;
-      k++;
+    // Rotate to bring elements in order
+    await this.rotate(firstCut, pivot, secondCut);
+    
+    const newMid = firstCut + len22;
+    
+    // Recursively merge the two halves
+    await this.merge(from, firstCut, newMid, len11, len22);
+    await this.merge(newMid, secondCut, to, len1 - len11, len2 - len22);
+  }
+  
+  // Main sort function
+  async stableSort(from, to) {
+    await sleep(this.stepSpeed); // Visualize the recursive structure
+    
+    if (to - from < 12) {
+      await this.insertSort(from, to);
+      return;
     }
+    
+    const middle = Math.floor((from + to) / 2);
+    
+    // Sort the two halves
+    await this.stableSort(from, middle);
+    await this.stableSort(middle, to);
+    
+    // Merge the sorted halves
+    await this.merge(from, middle, to, middle - from, to - middle);
   }
 }
 
@@ -372,7 +456,8 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'quick':
       return new QuickSort(dataset, stepSpeed);
     case 'merge':
-      return new MergeSort(dataset, stepSpeed);
+    case 'inplacestable':
+      return new InPlaceStableSort(dataset, stepSpeed);
     case 'insertion':
       return new InsertionSort(dataset, stepSpeed);
     case 'selection':
