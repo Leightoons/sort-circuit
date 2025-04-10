@@ -77,6 +77,10 @@ const Home = () => {
             <p>A stable sorting algorithm that works in-place without auxiliary storage, using binary search and rotations to efficiently merge sorted sections.</p>
           </div>
           <div className="card">
+            <h3>Merge Sort (Traditional)</h3>
+            <p>A classic divide-and-conquer algorithm that divides the array into two halves, sorts them, and then merges the sorted halves using auxiliary storage.</p>
+          </div>
+          <div className="card">
             <h3>Insertion Sort</h3>
             <p>A simple sorting algorithm that builds the final sorted array one item at a time.</p>
           </div>

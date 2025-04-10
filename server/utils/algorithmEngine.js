@@ -448,6 +448,115 @@ class SelectionSort extends SortingAlgorithm {
   }
 }
 
+// Traditional MergeSort implementation
+class MergeSort extends SortingAlgorithm {
+  constructor(dataset, stepSpeed) {
+    super(dataset, stepSpeed);
+    this.auxArray = new Array(dataset.length);
+  }
+  
+  async sort() {
+    await this.mergeSort(0, this.dataset.length - 1);
+  }
+  
+  async mergeSort(left, right) {
+    if (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      
+      // Sort first and second halves
+      await this.mergeSort(left, mid);
+      await this.mergeSort(mid + 1, right);
+      
+      // Merge the sorted halves
+      await this.merge(left, mid, right);
+    }
+  }
+  
+  async merge(left, mid, right) {
+    // Copy data to auxiliary array
+    for (let i = left; i <= right; i++) {
+      this.auxArray[i] = this.dataset[i];
+      
+      // Visualize copying to auxiliary array
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'copy',
+        indices: [i, i],
+        values: [this.dataset[i], this.auxArray[i]]
+      };
+      await sleep(this.stepSpeed);
+    }
+    
+    let i = left;      // Initial index of first subarray
+    let j = mid + 1;   // Initial index of second subarray
+    let k = left;      // Initial index of merged subarray
+    
+    // Merge back from aux array to the original array
+    while (i <= mid && j <= right) {
+      // Compare elements from both subarrays
+      await this.compare(i, j);
+      
+      if (this.auxArray[i] <= this.auxArray[j]) {
+        // Element from first subarray is smaller
+        this.dataset[k] = this.auxArray[i];
+        i++;
+      } else {
+        // Element from second subarray is smaller
+        this.dataset[k] = this.auxArray[j];
+        j++;
+      }
+      
+      // Visualize the placement
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, -1],
+        values: [this.dataset[k], this.auxArray[i-1 < left ? j-1 : i-1]]
+      };
+      await sleep(this.stepSpeed);
+      
+      k++;
+    }
+    
+    // Copy remaining elements from first subarray
+    while (i <= mid) {
+      this.dataset[k] = this.auxArray[i];
+      
+      // Visualize the copy back
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, i],
+        values: [this.dataset[k], this.auxArray[i]]
+      };
+      await sleep(this.stepSpeed);
+      
+      i++;
+      k++;
+    }
+    
+    // Copy remaining elements from second subarray
+    while (j <= right) {
+      this.dataset[k] = this.auxArray[j];
+      
+      // Visualize the copy back
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, j],
+        values: [this.dataset[k], this.auxArray[j]]
+      };
+      await sleep(this.stepSpeed);
+      
+      j++;
+      k++;
+    }
+  }
+}
+
 // Factory function to create appropriate algorithm instance
 const createAlgorithm = (type, dataset, stepSpeed) => {
   switch (type.toLowerCase()) {
@@ -458,6 +567,8 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'merge':
     case 'inplacestable':
       return new InPlaceStableSort(dataset, stepSpeed);
+    case 'mergetraditional':
+      return new MergeSort(dataset, stepSpeed);
     case 'insertion':
       return new InsertionSort(dataset, stepSpeed);
     case 'selection':

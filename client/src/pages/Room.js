@@ -10,7 +10,8 @@ const ALGORITHM_ORDER = {
   'insertion': 2,
   'selection': 3,
   'inplacestable': 4,
-  'quick': 5
+  'mergetraditional': 5,
+  'quick': 6
 };
 
 const Room = () => {
@@ -47,6 +48,7 @@ const Room = () => {
     bubble: true,
     quick: true,
     inplacestable: true,
+    mergetraditional: false,
     insertion: false,
     selection: false
   });
@@ -58,6 +60,7 @@ const Room = () => {
         bubble: false,
         quick: false,
         inplacestable: false,
+        mergetraditional: false,
         insertion: false,
         selection: false
       };
@@ -414,6 +417,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('inplacestable')}
             />
             <label htmlFor="algo-inplacestable">In-Place Stable Sort</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-mergetraditional"
+              checked={algorithmSelection.mergetraditional}
+              onChange={() => handleAlgorithmChange('mergetraditional')}
+            />
+            <label htmlFor="algo-mergetraditional">Merge Sort (Traditional)</label>
           </div>
           <div className="algorithm-option">
             <input

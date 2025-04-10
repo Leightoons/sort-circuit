@@ -518,7 +518,7 @@ const registerSocketHandlers = (io) => {
         }
         
         // Validate algorithm types
-        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'insertion', 'selection'];
+        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'mergetraditional', 'insertion', 'selection'];
         if (!algorithms.every(algo => validAlgorithms.includes(algo))) {
           socket.emit('room_error', { message: 'Invalid algorithm selection' });
           return;

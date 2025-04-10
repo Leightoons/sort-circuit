@@ -195,6 +195,16 @@ const Dashboard = () => {
               <div className="algorithm-option">
                 <input
                   type="checkbox"
+                  id="mergetraditional"
+                  name="mergetraditional"
+                  checked={selectedAlgorithms.includes('mergetraditional')}
+                  onChange={() => handleAlgorithmChange('mergetraditional')}
+                />
+                <label htmlFor="mergetraditional">Merge Sort (Traditional)</label>
+              </div>
+              <div className="algorithm-option">
+                <input
+                  type="checkbox"
                   id="insertion"
                   name="insertion"
                   checked={selectedAlgorithms.includes('insertion')}
