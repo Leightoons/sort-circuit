@@ -1,5 +1,5 @@
 const { getModel, generateRoomCode } = require('./config/db');
-const { startRace, getRaceStatus, stopRace, placeBet, updateRaceStepSpeed } = require('./controllers/race');
+const { startRace, getRaceStatus, stopRace, placeBet, updateRaceStepSpeed, endRaceEarly } = require('./controllers/race');
 const { getAllBetsForRoom, clearRoomBets } = require('./controllers/bets');
 
 // Store active socket connections by user
@@ -518,7 +518,7 @@ const registerSocketHandlers = (io) => {
         }
         
         // Validate algorithm types
-        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'merge', 'insertion', 'selection', 'heap'];
+        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'merge', 'insertion', 'selection', 'heap', 'bogo'];
         if (!algorithms.every(algo => validAlgorithms.includes(algo))) {
           socket.emit('room_error', { message: 'Invalid algorithm selection' });
           return;
@@ -707,6 +707,51 @@ const registerSocketHandlers = (io) => {
         });
       } catch (error) {
         console.error('Error updating race step speed:', error);
+        socket.emit('race_error', { message: 'Server error' });
+      }
+    });
+    
+    // Handle end race early
+    socket.on('end_race_early', ({ roomCode }) => {
+      try {
+        const Room = getModel('Room');
+        
+        // Validate input
+        if (!roomCode || !roomCode.trim()) {
+          socket.emit('race_error', { message: 'Room code is required' });
+          return;
+        }
+        
+        // Normalize room code
+        const normalizedRoomCode = roomCode.trim().toUpperCase();
+        
+        // Check if user is the host and room is racing
+        Room.findOne({ code: normalizedRoomCode }).then(async (room) => {
+          if (!room) {
+            socket.emit('race_error', { message: 'Room not found' });
+            return;
+          }
+          
+          // Check if user is the host
+          if (room.host !== socket.id) {
+            socket.emit('race_error', { message: 'Only host can end race early' });
+            return;
+          }
+          
+          // Check if room is racing
+          if (room.status !== 'racing') {
+            socket.emit('race_error', { message: 'Room is not currently racing' });
+            return;
+          }
+          
+          // End the race early
+          await endRaceEarly(io, socket, normalizedRoomCode);
+        }).catch(error => {
+          console.error('Error checking room for ending race early:', error);
+          socket.emit('race_error', { message: 'Server error' });
+        });
+      } catch (error) {
+        console.error('Error ending race early:', error);
         socket.emit('race_error', { message: 'Server error' });
       }
     });

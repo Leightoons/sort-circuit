@@ -109,11 +109,16 @@ export const RoomProvider = ({ children }) => {
     // Race started event
     socket.on('race_started', ({ dataset }) => {
       setRoomStatus('racing');
+      
+      // Completely reset race data to ensure no leftover state from previous races
+      // This prevents visualization jitter when starting a new race after ending one early
       setRaceData({
-        dataset,
+        dataset: [...dataset], // Use a new array reference to force re-rendering
         progress: {},
-        currentStep: 0
+        currentStep: 0,
+        endedEarly: false // Reset the ended early flag
       });
+      
       setResults(null);
     });
 
@@ -197,28 +202,73 @@ export const RoomProvider = ({ children }) => {
     });
 
     // Algorithm finished event
-    socket.on('algorithm_finished', (data) => {
-      // Update race data with finished algorithm
-      setRaceData((prevData) => ({
-        ...prevData,
-        progress: {
-          ...prevData.progress,
-          [data.type]: {
-            ...prevData.progress[data.type],
-            finished: true,
-            position: data.position
-          }
-        }
-      }));
+    socket.on('algorithm_finished', ({ type, position, steps, comparisons, swaps }) => {
+      setRaceData((prevData) => {
+        if (!prevData || !prevData.progress || !prevData.progress[type]) return prevData;
+        
+        const newProgress = { ...prevData.progress };
+        newProgress[type] = {
+          ...newProgress[type],
+          position,
+          steps,
+          comparisons,
+          swaps,
+          finished: true
+        };
+        
+        return { ...prevData, progress: newProgress };
+      });
+    });
+
+    // Algorithm stopped event (when a race is ended early)
+    socket.on('algorithm_stopped', ({ type, position, steps, comparisons, swaps }) => {
+      setRaceData((prevData) => {
+        if (!prevData || !prevData.progress || !prevData.progress[type]) return prevData;
+        
+        const newProgress = { ...prevData.progress };
+        newProgress[type] = {
+          ...newProgress[type],
+          position,
+          steps,
+          comparisons,
+          swaps,
+          finished: true,
+          stoppedEarly: true // Mark as stopped early
+        };
+        
+        return { ...prevData, progress: newProgress };
+      });
+    });
+
+    // Race ended early event
+    socket.on('race_ended_early', ({ stoppedBy, stoppedAlgorithms }) => {
+      console.log(`Race ended early by ${stoppedBy}, stopping algorithms:`, stoppedAlgorithms);
+      
+      // We need to ensure the raceData state is properly prepared for the next race
+      // to prevent visualization jitter problems
+      setRaceData(prevData => {
+        if (!prevData) return prevData;
+        
+        // Create a clean dataset reference that won't cause visualization jitter
+        const cleanDataset = [...prevData.dataset];
+        
+        // Return progress data with properly reset state for next race
+        return {
+          ...prevData,
+          dataset: cleanDataset,
+          // Keep the progress data for showing results
+          currentStep: prevData.currentStep,
+          endedEarly: true // Mark that this race was ended early
+        };
+      });
     });
 
     // Race results event
-    socket.on('race_results', ({ results: raceResults, winnerAlgorithm, winningUsers }) => {
+    socket.on('race_results', ({ results: raceResults, winnerAlgorithm }) => {
       setRoomStatus('finished');
       setResults({
-        results: raceResults,
         winnerAlgorithm,
-        winningUsers
+        results: raceResults
       });
     });
 
@@ -276,6 +326,16 @@ export const RoomProvider = ({ children }) => {
       setAllBets([]);
     });
 
+    // Room state reset event
+    socket.on('room_state_reset', ({ roomCode }) => {
+      console.log(`Room ${roomCode} state has been reset`);
+      setRoomStatus('waiting');
+      setResults(null);
+      
+      // Fully reset race data to prevent visualization issues in the next race
+      setRaceData(null);
+    });
+
     // Clean up listeners on unmount
     return () => {
       // Clean up all socket event listeners
@@ -291,6 +351,8 @@ export const RoomProvider = ({ children }) => {
         socket.off('race_update');
         socket.off('race_results');
         socket.off('algorithm_finished');
+        socket.off('algorithm_stopped');
+        socket.off('race_ended_early');
         socket.off('bet_placed');
         socket.off('bet_confirmed');
         socket.off('race_error');
@@ -298,6 +360,7 @@ export const RoomProvider = ({ children }) => {
         socket.off('host_assigned');
         socket.off('host_changed');
         socket.off('bets_reset');
+        socket.off('room_state_reset');
       }
     };
   }, [socket, connected]);

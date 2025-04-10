@@ -240,6 +240,13 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
+  // End a race early
+  const endRaceEarly = (roomCode) => {
+    if (socket && connected) {
+      socket.emit('end_race_early', { roomCode });
+    }
+  };
+
   // Leave a room
   const leaveRoom = (roomCode) => {
     if (socket && connected) {
@@ -267,6 +274,7 @@ export const SocketProvider = ({ children }) => {
         updateSettings,
         selectAlgorithms,
         resetRoomState,
+        endRaceEarly,
         leaveRoom,
         leaveCurrentRoom
       }}

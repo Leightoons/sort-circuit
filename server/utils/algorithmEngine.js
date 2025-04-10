@@ -650,6 +650,60 @@ class MergeSort extends SortingAlgorithm {
   }
 }
 
+/**
+ * Bogo Sort
+ * 
+ * A highly inefficient sorting algorithm that works by repeatedly randomly 
+ * shuffling the array until it happens to be sorted.
+ * This implementation counts each shuffle as a single operation.
+ */
+class BogoSort extends SortingAlgorithm {
+  async sort() {
+    // Check if the array is already sorted
+    while (!this.isSorted()) {
+      // If not sorted, shuffle the entire array as a single operation
+      await this.shuffleArray();
+      
+      // Check if we should continue running
+      if (!this.isRunning) break;
+    }
+  }
+  
+  // Check if array is sorted
+  isSorted() {
+    for (let i = 0; i < this.dataset.length - 1; i++) {
+      if (this.dataset[i] > this.dataset[i + 1]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  // Shuffle the entire array (Fisher-Yates algorithm)
+  async shuffleArray() {
+    const n = this.dataset.length;
+    const originalArray = [...this.dataset]; // Save for visualization
+    
+    // Fisher-Yates shuffle
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.dataset[i], this.dataset[j]] = [this.dataset[j], this.dataset[i]];
+    }
+    
+    // Count shuffle as a single operation
+    this.swaps++;
+    this.currentStep++;
+    this.lastOperation = {
+      type: 'shuffle',
+      indices: [...Array(n).keys()], // All indices are affected
+      values: originalArray // The original values before shuffle
+    };
+    
+    // Wait for visualization delay
+    await sleep(this.stepSpeed);
+  }
+}
+
 // Factory function to create appropriate algorithm instance
 const createAlgorithm = (type, dataset, stepSpeed) => {
   switch (type.toLowerCase()) {
@@ -670,6 +724,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'heap':
       // Heap sort using binary heap data structure
       return new HeapSort(dataset, stepSpeed);
+    case 'bogo':
+      // Bogo sort - highly inefficient random shuffle sort
+      return new BogoSort(dataset, stepSpeed);
     default:
       throw new Error(`Unknown algorithm type: ${type}`);
   }

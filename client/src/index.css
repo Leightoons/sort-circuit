@@ -882,3 +882,84 @@ p {
   margin-right: 5px;
   color: #2196F3;
 }
+
+/* End Race Early Section */
+.end-race-early {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px dashed #ccc;
+}
+
+.end-race-btn {
+  width: 100%;
+  margin-bottom: 8px;
+  display: block;
+  padding: 8px 12px;
+  background-color: #ff9800;
+  border: none;
+  color: white;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.end-race-btn:hover {
+  background-color: #f57c00;
+}
+
+.end-race-info {
+  font-size: 0.85rem;
+  color: #f57c00;
+  margin: 5px 0 0 0;
+}
+
+.end-race-info i {
+  margin-right: 5px;
+}
+
+/* Stopped Early Styling */
+.algorithm-visualization.stopped-early {
+  border-left: 3px solid #ff9800;
+  background-color: rgba(255, 152, 0, 0.05);
+}
+
+.stopped-early-badge {
+  background-color: #ff9800;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.algorithm-result.stopped-early {
+  border-color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.05);
+}
+
+.stopped-early-indicator {
+  color: #ff9800;
+  font-weight: bold;
+  margin-top: 5px;
+  font-size: 0.9rem;
+}
+
+/* Bogo Sort Shuffle Animation */
+@keyframes shuffle-animation {
+  0% { transform: translateY(0); }
+  25% { transform: translateY(-5px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(5px); }
+  100% { transform: translateY(0); }
+}
+
+.algorithm-visualization .data-block {
+  transition: height 0.3s ease-out, background-color 0.3s;
+}
+
+/* Shuffle animation for bogo sort */
+.algorithm-visualization.last-updated[data-algorithm="bogo"] .data-block {
+  animation: shuffle-animation 0.5s ease-in-out;
+}

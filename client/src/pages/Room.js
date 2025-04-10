@@ -12,7 +12,8 @@ const ALGORITHM_ORDER = {
   'heap': 4,
   'inplacestable': 5,
   'merge': 6,
-  'quick': 7
+  'quick': 7,
+  'bogo': 8
 };
 
 // Define proper display names for each algorithm
@@ -23,7 +24,8 @@ const ALGORITHM_NAMES = {
   'inplacestable': 'In-Place Stable Sort',
   'merge': 'Merge Sort',
   'quick': 'Quick Sort',
-  'heap': 'Heap Sort'
+  'heap': 'Heap Sort',
+  'bogo': 'Bogo Sort'
 };
 
 // Helper function to get the display name for an algorithm
@@ -35,7 +37,7 @@ const Room = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   
-  const { socket, username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms, resetRoomState } = useContext(SocketContext);
+  const { socket, username, connected, joinRoom, leaveRoom, placeBet, startRace, updateSettings, selectAlgorithms, resetRoomState, endRaceEarly } = useContext(SocketContext);
   const { 
     currentRoom, 
     isHost, 
@@ -68,11 +70,24 @@ const Room = () => {
     merge: false,
     insertion: false,
     selection: false,
-    heap: false
+    heap: false,
+    bogo: false
   });
   
   // Add a new state for live speed control
   const [liveSpeed, setLiveSpeed] = useState(settingsForm.stepSpeed || 100);
+  
+  // Add a state to track if any algorithm has finished
+  const [hasFinishedAlgorithm, setHasFinishedAlgorithm] = useState(false);
+  
+  // Cleanup visualization state when race status changes
+  useEffect(() => {
+    // When going from finished to waiting state, ensure visualization is reset
+    if (roomStatus === 'waiting' && raceData && raceData.endedEarly) {
+      console.log('Cleaning up race data after early end');
+      // This ensures we don't keep stale data that could cause jitter
+    }
+  }, [roomStatus, raceData]);
   
   // Sync algorithm selection with current algorithms
   useEffect(() => {
@@ -84,7 +99,8 @@ const Room = () => {
         merge: false,
         insertion: false,
         selection: false,
-        heap: false
+        heap: false,
+        bogo: false
       };
       
       algorithms.forEach(algo => {
@@ -132,6 +148,17 @@ const Room = () => {
       setLiveSpeed(settingsForm.stepSpeed);
     }
   }, [settingsForm]);
+  
+  // Check if at least one algorithm has finished whenever raceData updates
+  useEffect(() => {
+    if (raceData && raceData.progress) {
+      // Check if any algorithm has finished
+      const hasAnyFinished = Object.values(raceData.progress).some(algo => algo.finished);
+      setHasFinishedAlgorithm(hasAnyFinished);
+    } else {
+      setHasFinishedAlgorithm(false);
+    }
+  }, [raceData]);
   
   // Add handler for changing race speed during the race
   const handleLiveSpeedChange = (e) => {
@@ -239,7 +266,7 @@ const Room = () => {
   const renderAlgorithmVisualization = (algorithmType) => {
     if (!raceData || !raceData.progress || !raceData.progress[algorithmType]) {
       return (
-        <div className="algorithm-visualization waiting">
+        <div className="algorithm-visualization waiting" data-algorithm={algorithmType}>
           <h3>{getAlgorithmDisplayName(algorithmType)}</h3>
           <div className="waiting-text">Waiting for race to start...</div>
         </div>
@@ -247,10 +274,16 @@ const Room = () => {
     }
     
     const algorithmData = raceData.progress[algorithmType];
-    const { dataset, finished, position, comparisons, swaps } = algorithmData;
+    const { dataset, finished, position, comparisons, swaps, stoppedEarly } = algorithmData;
+    
+    // Ensure we have a valid dataset - if not, use the race dataset
+    const visualizationDataset = dataset || (raceData && raceData.dataset ? [...raceData.dataset] : []);
     
     return (
-      <div className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${algorithmData.lastOperation ? 'last-updated' : ''}`}>
+      <div 
+        className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${algorithmData.lastOperation ? 'last-updated' : ''} ${stoppedEarly ? 'stopped-early' : ''}`}
+        data-algorithm={algorithmType}
+      >
         <h3>{getAlgorithmDisplayName(algorithmType)}</h3>
         
         <div className="visualization-stats">
@@ -272,22 +305,30 @@ const Room = () => {
               <span>{position}</span>
             </div>
           )}
+          {stoppedEarly && (
+            <div className="stopped-early-badge">
+              <span>⚠️ Stopped</span>
+            </div>
+          )}
         </div>
         
         <div className="data-blocks">
-          {dataset && dataset.map((value, index) => {
+          {visualizationDataset && visualizationDataset.map((value, index) => {
             // Determine if this block should be highlighted
-            const shouldHighlight = algorithmData.lastOperation && 
-              algorithmData.lastOperation.indices.includes(index);
+            const isHighlighted = algorithmData.lastOperation && 
+              (algorithmData.lastOperation.indices.includes(index) || 
+               algorithmData.lastOperation.type === 'shuffle'); // Highlight all blocks during shuffle
             
             // Choose color based on operation type and alternating flag
             let backgroundColor = undefined;
-            if (shouldHighlight) {
+            if (isHighlighted) {
               const { type, alternate } = algorithmData.lastOperation;
               if (type === 'comparison') {
                 backgroundColor = alternate ? 'var(--color-compare-alt)' : 'var(--color-compare)';
               } else if (type === 'swap') {
                 backgroundColor = alternate ? 'var(--color-swap-alt)' : 'var(--color-swap)';
+              } else if (type === 'shuffle') {
+                backgroundColor = 'var(--color-swap)'; // Use swap color for shuffle
               }
             }
             
@@ -296,11 +337,11 @@ const Room = () => {
                 key={index} 
                 className="data-block"
                 style={{ 
-                  height: `${(value / Math.max(...dataset)) * 100}%`,
+                  height: `${(value / Math.max(...visualizationDataset)) * 100}%`,
                   backgroundColor
                 }}
               >
-                {dataset.length <= 20 && value}
+                {visualizationDataset.length <= 20 && value}
               </div>
             );
           })}
@@ -397,7 +438,7 @@ const Room = () => {
               return (ALGORITHM_ORDER[a[0]] || 99) - (ALGORITHM_ORDER[b[0]] || 99);
             })
             .map(([algo, data]) => (
-              <div key={algo} className={`algorithm-result ${data.isWinner ? 'winner' : ''}`}>
+              <div key={algo} className={`algorithm-result ${data.isWinner ? 'winner' : ''} ${data.stoppedEarly ? 'stopped-early' : ''}`}>
                 <h5>{getAlgorithmDisplayName(algo)}</h5>
                 <div className="result-stats">
                   <div className="stat">
@@ -416,6 +457,11 @@ const Room = () => {
                     <span>Swaps:</span>
                     <span>{data.swaps}</span>
                   </div>
+                  {data.stoppedEarly && (
+                    <div className="stopped-early-indicator">
+                      ⚠️ Stopped Early
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -513,6 +559,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('heap')}
             />
             <label htmlFor="algo-heap">{getAlgorithmDisplayName('heap')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-bogo"
+              checked={algorithmSelection.bogo}
+              onChange={() => handleAlgorithmChange('bogo')}
+            />
+            <label htmlFor="algo-bogo">{getAlgorithmDisplayName('bogo')}</label>
           </div>
         </div>
         <div className="settings-notice">
@@ -618,7 +673,7 @@ const Room = () => {
     
     return (
       <div className="live-speed-control">
-        <h3>Live Speed Control</h3>
+        <h3>Host Controls</h3>
         <div className="form-group">
           <label htmlFor="liveSpeed">Algorithm Speed (ms)</label>
           <input
@@ -636,9 +691,45 @@ const Room = () => {
         <p className="speed-info">
           <i className="fas fa-info-circle"></i> Changes apply immediately to all algorithms
         </p>
+        
+        {hasFinishedAlgorithm && (
+          <div className="end-race-early">
+            <button 
+              className="btn btn-warning end-race-btn" 
+              onClick={handleEndRaceEarly}
+            >
+              End Race Early
+            </button>
+            <p className="end-race-info">
+              <i className="fas fa-exclamation-triangle"></i> This will stop all remaining algorithms and declare a winner
+            </p>
+          </div>
+        )}
       </div>
     );
   };
+  
+  // Handle ending race early
+  const handleEndRaceEarly = () => {
+    endRaceEarly(roomCode);
+  };
+  
+  // Add event listener for race ended early notifications
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleRaceEndedEarly = (data) => {
+      if (data.roomCode === roomCode) {
+        console.log(`Race ended early by ${data.stoppedBy}`);
+      }
+    };
+    
+    socket.on('race_ended_early', handleRaceEndedEarly);
+    
+    return () => {
+      socket.off('race_ended_early', handleRaceEndedEarly);
+    };
+  }, [socket, roomCode]);
   
   if (!currentRoom) {
     return <div className="loading">Loading room...</div>;

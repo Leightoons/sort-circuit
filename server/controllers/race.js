@@ -170,12 +170,16 @@ const finalizeRace = async (io, roomCode) => {
     // Get final results with performance metrics
     const results = {};
     for (const [type, algorithm] of Object.entries(race.algorithms)) {
+      const isFinished = race.finishedAlgorithms.includes(type);
+      const wasStoppedEarly = isFinished && race.finishedAlgorithms.indexOf(type) > 0 && race.endedEarly;
+      
       results[type] = {
         position: race.finishedAlgorithms.indexOf(type) + 1,
         steps: algorithm.currentStep,
         comparisons: algorithm.comparisons,
         swaps: algorithm.swaps,
-        isWinner: type === winnerAlgorithm
+        isWinner: type === winnerAlgorithm,
+        stoppedEarly: wasStoppedEarly || false
       };
     }
     
@@ -184,7 +188,8 @@ const finalizeRace = async (io, roomCode) => {
       roomCode,
       results,
       winnerAlgorithm,
-      winningUsers
+      winningUsers,
+      endedEarly: race.endedEarly || false
     });
     
     // Clean up
@@ -301,11 +306,71 @@ exports.updateRaceStepSpeed = (io, socket, roomCode, newStepSpeed) => {
   }
 };
 
+// @desc    End a race early
+// @access  Server-only
+exports.endRaceEarly = async (io, socket, roomCode) => {
+  try {
+    // Get the active race
+    const race = activeRaces.get(roomCode);
+    
+    if (!race) {
+      socket.emit('race_error', { message: 'No active race found' });
+      return false;
+    }
+    
+    // Check if at least one algorithm has finished
+    if (race.finishedAlgorithms.length === 0) {
+      socket.emit('race_error', { message: 'Cannot end race early until at least one algorithm has finished' });
+      return false;
+    }
+    
+    // Mark the race as ended early so finalizeRace can handle it properly
+    race.endedEarly = true;
+    
+    // Stop all still-running algorithms
+    for (const [type, algorithm] of Object.entries(race.algorithms)) {
+      // If this algorithm hasn't finished yet
+      if (!race.finishedAlgorithms.includes(type) && algorithm.isRunning) {
+        algorithm.pause();
+        
+        // Add it to finished algorithms with a special marker
+        race.finishedAlgorithms.push(type);
+        
+        // Notify clients about algorithm being forcibly stopped
+        io.to(roomCode).emit('algorithm_stopped', {
+          type,
+          position: race.finishedAlgorithms.length,
+          steps: algorithm.currentStep,
+          comparisons: algorithm.comparisons,
+          swaps: algorithm.swaps
+        });
+      }
+    }
+    
+    // Finalize the race
+    await finalizeRace(io, roomCode);
+    
+    // Broadcast that the race was ended early
+    io.to(roomCode).emit('race_ended_early', {
+      roomCode,
+      stoppedBy: socket.username || socket.id,
+      stoppedAlgorithms: race.finishedAlgorithms.slice(1) // All except the winner
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error ending race early:', error);
+    socket.emit('race_error', { message: 'Server error' });
+    return false;
+  }
+};
+
 module.exports = {
   startRace: exports.startRace,
   getRaceStatus: exports.getRaceStatus,
   stopRace: exports.stopRace,
   placeBet: exports.placeBet,
   updateRaceStepSpeed: exports.updateRaceStepSpeed,
+  endRaceEarly: exports.endRaceEarly,
   getBetsForRoom
 }; 
