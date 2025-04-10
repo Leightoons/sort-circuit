@@ -86,7 +86,11 @@ const Home = () => {
           </div>
           <div className="card">
             <h3>Selection Sort</h3>
-            <p>A simple sorting algorithm that repeatedly finds the minimum element from the unsorted part and puts it at the beginning.</p>
+            <p>A simple sorting algorithm that repeatedly selects the smallest element from the unsorted portion and puts it at the beginning.</p>
+          </div>
+          <div className="card">
+            <h3>Heap Sort</h3>
+            <p>An efficient comparison-based sorting algorithm that uses a binary heap data structure. It achieves O(n log n) time complexity in all cases.</p>
           </div>
         </div>
       </div>

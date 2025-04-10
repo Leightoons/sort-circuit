@@ -10,7 +10,8 @@ const ALGORITHM_NAMES = {
   'selection': 'Selection Sort',
   'inplacestable': 'In-Place Stable Sort',
   'merge': 'Merge Sort',
-  'quick': 'Quick Sort'
+  'quick': 'Quick Sort',
+  'heap': 'Heap Sort'
 };
 
 // Helper function to get the display name for an algorithm
@@ -236,6 +237,16 @@ const Dashboard = () => {
                   onChange={() => handleAlgorithmChange('selection')}
                 />
                 <label htmlFor="selection">{getAlgorithmDisplayName('selection')}</label>
+              </div>
+              <div className="algorithm-option">
+                <input
+                  type="checkbox"
+                  id="heap"
+                  name="heap"
+                  checked={selectedAlgorithms.includes('heap')}
+                  onChange={() => handleAlgorithmChange('heap')}
+                />
+                <label htmlFor="heap">{getAlgorithmDisplayName('heap')}</label>
               </div>
             </div>
           </div>

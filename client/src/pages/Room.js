@@ -9,9 +9,10 @@ const ALGORITHM_ORDER = {
   'bubble': 1,
   'insertion': 2,
   'selection': 3,
-  'inplacestable': 4,
-  'merge': 5,
-  'quick': 6
+  'heap': 4,
+  'inplacestable': 5,
+  'merge': 6,
+  'quick': 7
 };
 
 // Define proper display names for each algorithm
@@ -21,7 +22,8 @@ const ALGORITHM_NAMES = {
   'selection': 'Selection Sort',
   'inplacestable': 'In-Place Stable Sort',
   'merge': 'Merge Sort',
-  'quick': 'Quick Sort'
+  'quick': 'Quick Sort',
+  'heap': 'Heap Sort'
 };
 
 // Helper function to get the display name for an algorithm
@@ -65,7 +67,8 @@ const Room = () => {
     inplacestable: true,
     merge: false,
     insertion: false,
-    selection: false
+    selection: false,
+    heap: false
   });
   
   // Sync algorithm selection with current algorithms
@@ -77,7 +80,8 @@ const Room = () => {
         inplacestable: false,
         merge: false,
         insertion: false,
-        selection: false
+        selection: false,
+        heap: false
       };
       
       algorithms.forEach(algo => {
@@ -459,6 +463,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('selection')}
             />
             <label htmlFor="algo-selection">{getAlgorithmDisplayName('selection')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-heap"
+              checked={algorithmSelection.heap}
+              onChange={() => handleAlgorithmChange('heap')}
+            />
+            <label htmlFor="algo-heap">{getAlgorithmDisplayName('heap')}</label>
           </div>
         </div>
         <div className="settings-notice">

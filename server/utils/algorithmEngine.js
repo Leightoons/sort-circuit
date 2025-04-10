@@ -476,6 +476,66 @@ class SelectionSort extends SortingAlgorithm {
 }
 
 /**
+ * Heap Sort
+ * 
+ * Comparison-based sorting algorithm that uses a binary heap data structure.
+ * It divides the input into a sorted and an unsorted region, and iteratively
+ * shrinks the unsorted region by extracting the largest element and moving it
+ * to the sorted region.
+ */
+class HeapSort extends SortingAlgorithm {
+  async sort() {
+    const n = this.dataset.length;
+    
+    // Build heap (rearrange array)
+    for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+      await this.heapify(n, i);
+    }
+    
+    // One by one extract elements from heap
+    for (let i = n - 1; i > 0; i--) {
+      // Move current root to end
+      await this.swap(0, i);
+      
+      // Call heapify on the reduced heap
+      await this.heapify(i, 0);
+    }
+  }
+  
+  // To heapify a subtree rooted with node i which is an index in this.dataset[]
+  // n is size of heap
+  async heapify(n, i) {
+    let largest = i; // Initialize largest as root
+    const left = 2 * i + 1; // left = 2*i + 1
+    const right = 2 * i + 2; // right = 2*i + 2
+    
+    // If left child is larger than root
+    if (left < n) {
+      const isLarger = await this.compare(largest, left);
+      if (!isLarger) {
+        largest = left;
+      }
+    }
+    
+    // If right child is larger than largest so far
+    if (right < n) {
+      const isLarger = await this.compare(largest, right);
+      if (!isLarger) {
+        largest = right;
+      }
+    }
+    
+    // If largest is not root
+    if (largest !== i) {
+      await this.swap(i, largest);
+      
+      // Recursively heapify the affected sub-tree
+      await this.heapify(n, largest);
+    }
+  }
+}
+
+/**
  * Traditional Merge Sort
  * 
  * Classic divide-and-conquer algorithm that divides the array into two halves,
@@ -607,6 +667,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
       return new InsertionSort(dataset, stepSpeed);
     case 'selection':
       return new SelectionSort(dataset, stepSpeed);
+    case 'heap':
+      // Heap sort using binary heap data structure
+      return new HeapSort(dataset, stepSpeed);
     default:
       throw new Error(`Unknown algorithm type: ${type}`);
   }
