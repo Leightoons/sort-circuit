@@ -101,7 +101,12 @@ class SortingAlgorithm {
   }
 }
 
-// BubbleSort implementation
+/**
+ * Bubble Sort
+ * 
+ * Simple comparison-based algorithm that repeatedly steps through the list,
+ * compares adjacent elements, and swaps them if they are in the wrong order.
+ */
 class BubbleSort extends SortingAlgorithm {
   async sort() {
     const n = this.dataset.length;
@@ -126,7 +131,13 @@ class BubbleSort extends SortingAlgorithm {
   }
 }
 
-// QuickSort implementation
+/**
+ * Quick Sort
+ * 
+ * Divide-and-conquer algorithm that selects a pivot element and partitions
+ * the array around the pivot, placing smaller elements to the left and 
+ * larger ones to the right.
+ */
 class QuickSort extends SortingAlgorithm {
   async sort() {
     await this.quickSort(0, this.dataset.length - 1);
@@ -167,7 +178,13 @@ class QuickSort extends SortingAlgorithm {
   }
 }
 
-// MergeSort implementation
+/**
+ * In-Place Stable Sort
+ * 
+ * Advanced merge sort variant that works in-place without auxiliary storage.
+ * Uses binary search and clever rotations to efficiently merge sorted sections.
+ * Based on the algorithm from C++ STL library.
+ */
 class InPlaceStableSort extends SortingAlgorithm {
   async sort() {
     await this.stableSort(0, this.dataset.length);
@@ -360,7 +377,12 @@ class InPlaceStableSort extends SortingAlgorithm {
   }
 }
 
-// InsertionSort implementation
+/**
+ * Insertion Sort
+ * 
+ * Simple sorting algorithm that builds the final sorted array one item at a time.
+ * Similar to how people sort playing cards in their hands.
+ */
 class InsertionSort extends SortingAlgorithm {
   async sort() {
     const n = this.dataset.length;
@@ -417,7 +439,12 @@ class InsertionSort extends SortingAlgorithm {
   }
 }
 
-// SelectionSort implementation
+/**
+ * Selection Sort
+ * 
+ * Simple sorting algorithm that repeatedly finds the minimum element from the
+ * unsorted portion and puts it at the beginning.
+ */
 class SelectionSort extends SortingAlgorithm {
   async sort() {
     const n = this.dataset.length;
@@ -448,7 +475,13 @@ class SelectionSort extends SortingAlgorithm {
   }
 }
 
-// Traditional MergeSort implementation
+/**
+ * Traditional Merge Sort
+ * 
+ * Classic divide-and-conquer algorithm that divides the array into two halves,
+ * sorts them separately, and then merges them using auxiliary storage.
+ * This is the textbook implementation with O(n log n) time and O(n) space complexity.
+ */
 class MergeSort extends SortingAlgorithm {
   constructor(dataset, stepSpeed) {
     super(dataset, stepSpeed);
@@ -564,10 +597,11 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
       return new BubbleSort(dataset, stepSpeed);
     case 'quick':
       return new QuickSort(dataset, stepSpeed);
-    case 'merge':
-    case 'inplacestable':
+    case 'inplacestable': 
+      // In-place stable sort (no auxiliary array)
       return new InPlaceStableSort(dataset, stepSpeed);
-    case 'mergetraditional':
+    case 'merge':
+      // Traditional merge sort with auxiliary array
       return new MergeSort(dataset, stepSpeed);
     case 'insertion':
       return new InsertionSort(dataset, stepSpeed);

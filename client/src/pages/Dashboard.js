@@ -3,6 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
 
+// Define proper display names for each algorithm
+const ALGORITHM_NAMES = {
+  'bubble': 'Bubble Sort',
+  'insertion': 'Insertion Sort',
+  'selection': 'Selection Sort',
+  'inplacestable': 'In-Place Stable Sort',
+  'merge': 'Merge Sort',
+  'quick': 'Quick Sort'
+};
+
+// Helper function to get the display name for an algorithm
+const getAlgorithmDisplayName = (algorithmId) => {
+  return ALGORITHM_NAMES[algorithmId] || algorithmId.charAt(0).toUpperCase() + algorithmId.slice(1) + ' Sort';
+};
+
 const Dashboard = () => {
   const [roomCode, setRoomCode] = useState('');
   const [selectedAlgorithms, setSelectedAlgorithms] = useState(['bubble', 'quick', 'inplacestable']);
@@ -170,7 +185,7 @@ const Dashboard = () => {
                   checked={selectedAlgorithms.includes('bubble')}
                   onChange={() => handleAlgorithmChange('bubble')}
                 />
-                <label htmlFor="bubble">Bubble Sort</label>
+                <label htmlFor="bubble">{getAlgorithmDisplayName('bubble')}</label>
               </div>
               <div className="algorithm-option">
                 <input
@@ -180,7 +195,7 @@ const Dashboard = () => {
                   checked={selectedAlgorithms.includes('quick')}
                   onChange={() => handleAlgorithmChange('quick')}
                 />
-                <label htmlFor="quick">Quick Sort</label>
+                <label htmlFor="quick">{getAlgorithmDisplayName('quick')}</label>
               </div>
               <div className="algorithm-option">
                 <input
@@ -190,17 +205,17 @@ const Dashboard = () => {
                   checked={selectedAlgorithms.includes('inplacestable')}
                   onChange={() => handleAlgorithmChange('inplacestable')}
                 />
-                <label htmlFor="inplacestable">In-Place Stable Sort</label>
+                <label htmlFor="inplacestable">{getAlgorithmDisplayName('inplacestable')}</label>
               </div>
               <div className="algorithm-option">
                 <input
                   type="checkbox"
-                  id="mergetraditional"
-                  name="mergetraditional"
-                  checked={selectedAlgorithms.includes('mergetraditional')}
-                  onChange={() => handleAlgorithmChange('mergetraditional')}
+                  id="merge"
+                  name="merge"
+                  checked={selectedAlgorithms.includes('merge')}
+                  onChange={() => handleAlgorithmChange('merge')}
                 />
-                <label htmlFor="mergetraditional">Merge Sort (Traditional)</label>
+                <label htmlFor="merge">{getAlgorithmDisplayName('merge')}</label>
               </div>
               <div className="algorithm-option">
                 <input
@@ -210,7 +225,7 @@ const Dashboard = () => {
                   checked={selectedAlgorithms.includes('insertion')}
                   onChange={() => handleAlgorithmChange('insertion')}
                 />
-                <label htmlFor="insertion">Insertion Sort</label>
+                <label htmlFor="insertion">{getAlgorithmDisplayName('insertion')}</label>
               </div>
               <div className="algorithm-option">
                 <input
@@ -220,7 +235,7 @@ const Dashboard = () => {
                   checked={selectedAlgorithms.includes('selection')}
                   onChange={() => handleAlgorithmChange('selection')}
                 />
-                <label htmlFor="selection">Selection Sort</label>
+                <label htmlFor="selection">{getAlgorithmDisplayName('selection')}</label>
               </div>
             </div>
           </div>

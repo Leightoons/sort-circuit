@@ -10,8 +10,23 @@ const ALGORITHM_ORDER = {
   'insertion': 2,
   'selection': 3,
   'inplacestable': 4,
-  'mergetraditional': 5,
+  'merge': 5,
   'quick': 6
+};
+
+// Define proper display names for each algorithm
+const ALGORITHM_NAMES = {
+  'bubble': 'Bubble Sort',
+  'insertion': 'Insertion Sort',
+  'selection': 'Selection Sort',
+  'inplacestable': 'In-Place Stable Sort',
+  'merge': 'Merge Sort',
+  'quick': 'Quick Sort'
+};
+
+// Helper function to get the display name for an algorithm
+const getAlgorithmDisplayName = (algorithmId) => {
+  return ALGORITHM_NAMES[algorithmId] || algorithmId.charAt(0).toUpperCase() + algorithmId.slice(1) + ' Sort';
 };
 
 const Room = () => {
@@ -48,7 +63,7 @@ const Room = () => {
     bubble: true,
     quick: true,
     inplacestable: true,
-    mergetraditional: false,
+    merge: false,
     insertion: false,
     selection: false
   });
@@ -60,7 +75,7 @@ const Room = () => {
         bubble: false,
         quick: false,
         inplacestable: false,
-        mergetraditional: false,
+        merge: false,
         insertion: false,
         selection: false
       };
@@ -180,7 +195,7 @@ const Room = () => {
     if (!raceData || !raceData.progress || !raceData.progress[algorithmType]) {
       return (
         <div className="algorithm-visualization waiting">
-          <h3>{algorithmType.charAt(0).toUpperCase() + algorithmType.slice(1)} Sort</h3>
+          <h3>{getAlgorithmDisplayName(algorithmType)}</h3>
           <div className="waiting-text">Waiting for race to start...</div>
         </div>
       );
@@ -191,7 +206,7 @@ const Room = () => {
     
     return (
       <div className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${algorithmData.lastOperation ? 'last-updated' : ''}`}>
-        <h3>{algorithmType.charAt(0).toUpperCase() + algorithmType.slice(1)} Sort</h3>
+        <h3>{getAlgorithmDisplayName(algorithmType)}</h3>
         
         <div className="visualization-stats">
           <div className="stat">
@@ -255,7 +270,7 @@ const Room = () => {
       return (
         <div className="betting-section">
           <h3>Betting Closed</h3>
-          {userBet && <p>Your bet: <strong>{userBet.charAt(0).toUpperCase() + userBet.slice(1)} Sort</strong></p>}
+          {userBet && <p>Your bet: <strong>{getAlgorithmDisplayName(userBet)}</strong></p>}
         </div>
       );
     }
@@ -283,7 +298,7 @@ const Room = () => {
                   onChange={() => setSelectedAlgorithm(algo)}
                 />
                 <label htmlFor={`bet-${algo}`}>
-                  {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
+                  {getAlgorithmDisplayName(algo)}
                 </label>
               </div>
             ))}
@@ -291,7 +306,7 @@ const Room = () => {
         
         {userBet ? (
           <div className="betting-confirmation">
-            <p>Your current bet: <strong>{userBet.charAt(0).toUpperCase() + userBet.slice(1)} Sort</strong></p>
+            <p>Your current bet: <strong>{getAlgorithmDisplayName(userBet)}</strong></p>
             <button 
               className="btn btn-primary" 
               onClick={handlePlaceBet} 
@@ -322,7 +337,7 @@ const Room = () => {
         <h3>Race Results</h3>
         
         <div className="winner-announcement">
-          <h4>Winner: {results.winnerAlgorithm.charAt(0).toUpperCase() + results.winnerAlgorithm.slice(1)} Sort</h4>
+          <h4>Winner: {getAlgorithmDisplayName(results.winnerAlgorithm)}</h4>
         </div>
         
         <div className="algorithm-results">
@@ -338,7 +353,7 @@ const Room = () => {
             })
             .map(([algo, data]) => (
               <div key={algo} className={`algorithm-result ${data.isWinner ? 'winner' : ''}`}>
-                <h5>{algo.charAt(0).toUpperCase() + algo.slice(1)} Sort</h5>
+                <h5>{getAlgorithmDisplayName(algo)}</h5>
                 <div className="result-stats">
                   <div className="stat">
                     <span>Position:</span>
@@ -398,7 +413,7 @@ const Room = () => {
               checked={algorithmSelection.bubble}
               onChange={() => handleAlgorithmChange('bubble')}
             />
-            <label htmlFor="algo-bubble">Bubble Sort</label>
+            <label htmlFor="algo-bubble">{getAlgorithmDisplayName('bubble')}</label>
           </div>
           <div className="algorithm-option">
             <input
@@ -407,7 +422,7 @@ const Room = () => {
               checked={algorithmSelection.quick}
               onChange={() => handleAlgorithmChange('quick')}
             />
-            <label htmlFor="algo-quick">Quick Sort</label>
+            <label htmlFor="algo-quick">{getAlgorithmDisplayName('quick')}</label>
           </div>
           <div className="algorithm-option">
             <input
@@ -416,16 +431,16 @@ const Room = () => {
               checked={algorithmSelection.inplacestable}
               onChange={() => handleAlgorithmChange('inplacestable')}
             />
-            <label htmlFor="algo-inplacestable">In-Place Stable Sort</label>
+            <label htmlFor="algo-inplacestable">{getAlgorithmDisplayName('inplacestable')}</label>
           </div>
           <div className="algorithm-option">
             <input
               type="checkbox"
-              id="algo-mergetraditional"
-              checked={algorithmSelection.mergetraditional}
-              onChange={() => handleAlgorithmChange('mergetraditional')}
+              id="algo-merge"
+              checked={algorithmSelection.merge}
+              onChange={() => handleAlgorithmChange('merge')}
             />
-            <label htmlFor="algo-mergetraditional">Merge Sort (Traditional)</label>
+            <label htmlFor="algo-merge">{getAlgorithmDisplayName('merge')}</label>
           </div>
           <div className="algorithm-option">
             <input
@@ -434,7 +449,7 @@ const Room = () => {
               checked={algorithmSelection.insertion}
               onChange={() => handleAlgorithmChange('insertion')}
             />
-            <label htmlFor="algo-insertion">Insertion Sort</label>
+            <label htmlFor="algo-insertion">{getAlgorithmDisplayName('insertion')}</label>
           </div>
           <div className="algorithm-option">
             <input
@@ -443,7 +458,7 @@ const Room = () => {
               checked={algorithmSelection.selection}
               onChange={() => handleAlgorithmChange('selection')}
             />
-            <label htmlFor="algo-selection">Selection Sort</label>
+            <label htmlFor="algo-selection">{getAlgorithmDisplayName('selection')}</label>
           </div>
         </div>
         <div className="settings-notice">
