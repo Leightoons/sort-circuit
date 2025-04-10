@@ -11,42 +11,42 @@ class SortingAlgorithm {
   constructor(dataset, stepSpeed = 500) {
     this.dataset = [...dataset]; // Clone the array to avoid modifying the original
     this.stepSpeed = stepSpeed;
-    this.currentStep = 0;
     this.comparisons = 0;
     this.swaps = 0;
     this.finished = false;
     this.lastOperation = null;
     this.isRunning = false;
+    this.currentStep = 0;
   }
 
-  // Async method to perform one step of the algorithm
-  async step() {
-    throw new Error('Step method must be implemented by subclasses');
+  // Async method to sort the array
+  async sort() {
+    throw new Error('Sort method must be implemented by subclasses');
   }
 
-  // Async method to run the entire algorithm with delays between steps
+  // Main method to run the algorithm
   async run() {
     if (this.isRunning) return;
     this.isRunning = true;
     
-    while (!this.finished) {
-      var lastStep = this.currentStep;
-      while (this.currentStep === lastStep) {
-        await this.step();
-      }
-      await sleep(this.stepSpeed);
+    try {
+      await this.sort();
+    } catch (error) {
+      console.error('Error running sort algorithm:', error);
+    } finally {
+      this.isRunning = false;
+      this.finished = true;
     }
     
-    this.isRunning = false;
     return this.dataset;
   }
   
-  // Method to pause the execution
+  // Method to pause the execution - can be implemented if needed
   pause() {
     this.isRunning = false;
   }
   
-  // Method to resume the execution
+  // Method to resume the execution - can be implemented if needed
   async resume() {
     if (!this.finished && !this.isRunning) {
       await this.run();
@@ -77,7 +77,7 @@ class SortingAlgorithm {
     };
     
     // Wait for visualization delay
-    //await sleep(this.stepSpeed);
+    await sleep(this.stepSpeed);
     
     return this.dataset[i] > this.dataset[j];
   }
@@ -91,169 +91,79 @@ class SortingAlgorithm {
       indices: [i, j],
       values: [this.dataset[i], this.dataset[j]]
     };
+    
     var temp = this.dataset[i];
     this.dataset[i] = this.dataset[j];
     this.dataset[j] = temp;
     
     // Wait for visualization delay
-    //await sleep(this.stepSpeed);
+    await sleep(this.stepSpeed);
   }
 }
 
 // BubbleSort implementation
 class BubbleSort extends SortingAlgorithm {
-  constructor(dataset, stepSpeed) {
-    super(dataset, stepSpeed);
-    this.i = 0;
-    this.j = 0;
-    this.swapped = false;
-    this.state = 'compare';
-  }
-
-  async step() {
-    if (this.finished) return;
+  async sort() {
+    const n = this.dataset.length;
     
-    // Check if we need to move to the next iteration
-    if (this.j >= this.dataset.length - this.i - 1) {
-      if (!this.swapped) {
-        this.finished = true;
-        return;
-      }
-      this.i++;
-      this.j = 0;
-      this.swapped = false;
-    }
-    
-    // Always perform exactly one operation per step
-    if (this.state === 'compare') {
-      await this.compare(this.j, this.j + 1);
-      this.state = 'swap';
-      return;
-    }
-    
-    if (this.state === 'swap') {
-      // Only swap if needed
-      if (this.lastOperation && this.lastOperation.type === 'comparison') {
-        const shouldSwap = this.dataset[this.j] > this.dataset[this.j + 1];
+    for (let i = 0; i < n - 1; i++) {
+      let swapped = false;
+      
+      for (let j = 0; j < n - i - 1; j++) {
+        // Compare adjacent elements
+        const shouldSwap = await this.compare(j, j + 1);
+        
+        // Swap if needed
         if (shouldSwap) {
-          await this.swap(this.j, this.j + 1);
-          this.swapped = true;
-        } else {
-          // Need to perform some operation, so just compare the same elements again
-          await this.compare(this.j, this.j + 1);
-          this.lastOperation.result = 'no-swap-needed';
+          await this.swap(j, j + 1);
+          swapped = true;
         }
       }
-      this.j++;
-      this.state = 'compare';
+      
+      // If no swapping occurred in this pass, array is sorted
+      if (!swapped) break;
     }
   }
 }
 
 // QuickSort implementation
 class QuickSort extends SortingAlgorithm {
-  constructor(dataset, stepSpeed) {
-    super(dataset, stepSpeed);
-    this.stack = [[0, dataset.length - 1]];
-    this.pivotIndex = null;
-    this.left = null;
-    this.right = null;
-    this.i = null;
-    this.j = null;
-    this.state = 'start';
-    this.hasCompared = false;
+  async sort() {
+    await this.quickSort(0, this.dataset.length - 1);
   }
-
-  async step() {
-    if (this.finished) return;
-    
-    // Initialize a new partition
-    if (this.state === 'start' && this.stack.length > 0) {
-      [this.left, this.right] = this.stack.pop();
+  
+  async quickSort(low, high) {
+    if (low < high) {
+      // Partition the array and get the pivot index
+      const pivotIndex = await this.partition(low, high);
       
-      if (this.left >= this.right) {
-        // Compare the element with itself to ensure we perform an operation
-        await this.compare(this.left, this.left);
-        this.state = 'start';
-        return;
-      }
-      
-      this.pivotIndex = this.right;
-      this.i = this.left - 1;
-      this.j = this.left;
-      
-      // Do a comparison to ensure we perform an operation
-      await this.compare(this.left, this.right);
-      this.state = 'compare';
-      this.hasCompared = false;
-      return;
+      // Recursively sort the sub-arrays
+      await this.quickSort(low, pivotIndex - 1);
+      await this.quickSort(pivotIndex + 1, high);
     }
+  }
+  
+  async partition(low, high) {
+    // Choose the rightmost element as pivot
+    const pivot = this.dataset[high];
+    let i = low - 1;
     
-    // Compare current element with pivot
-    if (this.state === 'compare') {
-      if (this.j < this.right) {
-        if (!this.hasCompared) {
-          // Perform comparison first
-          await this.compare(this.pivotIndex, this.j);
-          this.hasCompared = true;
-          return;
-        } else {
-          // Then, based on the comparison, maybe do a swap
-          if (this.lastOperation && this.lastOperation.type === 'comparison') {
-            const shouldSwap = this.dataset[this.j] < this.dataset[this.pivotIndex];
-            if (shouldSwap) {
-              this.i++;
-              this.state = 'swap';
-              return;
-            } else {
-              // No swap needed, move to next element and perform another comparison
-              this.j++;
-              this.hasCompared = false;
-              await this.compare(this.pivotIndex, this.j);
-              this.hasCompared = true;
-              return;
-            }
-          }
-        }
-      } else {
-        // Done with all elements, time to place pivot
-        this.i++;
-        this.state = 'place-pivot';
-        return;
+    // Compare all elements with the pivot
+    for (let j = low; j < high; j++) {
+      // Compare current element with pivot
+      await this.compare(j, high);
+      
+      // If current element is less than pivot
+      if (this.dataset[j] < pivot) {
+        i++;
+        // Swap elements at i and j
+        await this.swap(i, j);
       }
-    }
-    
-    // Swap elements
-    if (this.state === 'swap') {
-      await this.swap(this.i, this.j);
-      this.j++;
-      this.state = 'compare';
-      this.hasCompared = false;
-      return;
     }
     
     // Place pivot in its final position
-    if (this.state === 'place-pivot') {
-      await this.swap(this.i, this.pivotIndex);
-      this.state = 'push-subarrays';
-      return;
-    }
-    
-    // Push subarrays for further processing
-    if (this.state === 'push-subarrays') {
-      this.stack.push([this.left, this.i - 1]);
-      this.stack.push([this.i + 1, this.right]);
-      
-      // Compare the pivot with itself to ensure we perform an operation
-      await this.compare(this.i, this.i);
-      this.state = 'start';
-      return;
-    }
-    
-    if (this.stack.length === 0) {
-      this.finished = true;
-      return;
-    }
+    await this.swap(i + 1, high);
+    return i + 1;
   }
 }
 
@@ -262,306 +172,193 @@ class MergeSort extends SortingAlgorithm {
   constructor(dataset, stepSpeed) {
     super(dataset, stepSpeed);
     this.auxiliaryArray = [...dataset];
-    this.size = 1;
-    this.leftStart = 0;
-    this.leftEnd = 0;
-    this.rightStart = 0;
-    this.rightEnd = 0;
-    this.left = 0;
-    this.right = 0;
-    this.index = 0;
-    this.state = 'start';
-    this.subState = null;
-    this.copyIndex = -1;
   }
-
-  async step() {
-    if (this.finished) return;
-    
-    if (this.size >= this.dataset.length) {
-      this.finished = true;
-      return;
-    }
-    
-    // Setup merge operation
-    if (this.state === 'start') {
-      this.leftStart = 0;
-      // Compare first element with itself to ensure we do an operation
-      await this.compare(0, 0);
-      this.state = 'setup';
-      return;
-    }
-    
-    // Configure the merge operation
-    if (this.state === 'setup') {
-      this.leftEnd = Math.min(this.leftStart + this.size - 1, this.dataset.length - 1);
-      this.rightStart = this.leftEnd + 1;
-      this.rightEnd = Math.min(this.rightStart + this.size - 1, this.dataset.length - 1);
+  
+  async sort() {
+    await this.mergeSort(0, this.dataset.length - 1);
+  }
+  
+  async mergeSort(left, right) {
+    if (left < right) {
+      const mid = Math.floor((left + right) / 2);
       
-      // Initialize indices for the merge
-      this.left = this.leftStart;
-      this.right = this.rightStart;
-      this.index = this.leftStart;
+      // Sort first and second halves
+      await this.mergeSort(left, mid);
+      await this.mergeSort(mid + 1, right);
       
-      // Compare boundary elements to ensure we do an operation
-      if (this.right < this.dataset.length) {
-        await this.compare(this.leftEnd, this.rightStart);
-      } else {
-        // If we're at the end of the array, just compare with self
-        await this.compare(this.leftStart, this.leftStart);
-      }
-      
-      this.state = 'compare';
-      return;
+      // Merge the sorted halves
+      await this.merge(left, mid, right);
     }
-    
-    // Compare values from both subarrays
-    if (this.state === 'compare') {
-      if (this.left <= this.leftEnd && this.right <= this.rightEnd) {
-        // Perform one comparison
-        await this.compare(this.left, this.right);
-        
-        if (this.dataset[this.left] <= this.dataset[this.right]) {
-          this.auxiliaryArray[this.index] = this.dataset[this.left];
-          this.left++;
-        } else {
-          this.auxiliaryArray[this.index] = this.dataset[this.right];
-          this.right++;
-        }
-        this.index++;
-        return;
-      } else if (this.left <= this.leftEnd) {
-        // Compare the element with itself before copying
-        await this.compare(this.left, this.left);
-        this.state = 'copy-left';
-        return;
-      } else if (this.right <= this.rightEnd) {
-        // Compare the element with itself before copying
-        await this.compare(this.right, this.right);
-        this.state = 'copy-right';
-        return;
-      } else {
-        // Compare last element with itself before starting copy-back
-        await this.compare(this.leftStart, this.leftStart);
-        this.state = 'copy-back';
-        this.copyIndex = this.leftStart;
-        return;
-      }
-    }
-    
-    // Copy remaining left elements
-    if (this.state === 'copy-left') {
-      this.auxiliaryArray[this.index] = this.dataset[this.left];
-      this.left++;
-      this.index++;
+  }
+  
+  async merge(left, mid, right) {
+    // Copy data to auxiliary arrays
+    for (let i = left; i <= right; i++) {
+      this.auxiliaryArray[i] = this.dataset[i];
       
-      // Record the operation without modifying the main array
+      // Visualize the copying
+      this.currentStep++;
       this.lastOperation = {
         type: 'copy',
-        indices: [this.left - 1, this.index - 1],
-        values: [this.dataset[this.left - 1], this.auxiliaryArray[this.index - 1]]
+        indices: [i, i],
+        values: [this.dataset[i], this.auxiliaryArray[i]]
       };
-      
-      if (this.left > this.leftEnd) {
-        this.state = this.right <= this.rightEnd ? 'copy-right' : 'copy-back';
-        this.copyIndex = this.leftStart;
-      }
-      return;
+      await sleep(this.stepSpeed);
     }
     
-    // Copy remaining right elements
-    if (this.state === 'copy-right') {
-      this.auxiliaryArray[this.index] = this.dataset[this.right];
-      this.right++;
-      this.index++;
-      
-      // Record the operation without modifying the main array
-      this.lastOperation = {
-        type: 'copy',
-        indices: [this.right - 1, this.index - 1],
-        values: [this.dataset[this.right - 1], this.auxiliaryArray[this.index - 1]]
-      };
-      
-      if (this.right > this.rightEnd) {
-        this.state = 'copy-back';
-        this.copyIndex = this.leftStart;
-      }
-      return;
-    }
+    let i = left; // Initial index of first subarray
+    let j = mid + 1; // Initial index of second subarray
+    let k = left; // Initial index of merged subarray
     
-    // Copy from auxiliary array back to main array
-    if (this.state === 'copy-back') {
-      if (this.copyIndex <= this.rightEnd) {
-        const oldValue = this.dataset[this.copyIndex];
-        this.dataset[this.copyIndex] = this.auxiliaryArray[this.copyIndex];
-        this.lastOperation = {
-          type: 'swap',
-          indices: [this.copyIndex, this.copyIndex],
-          values: [oldValue, this.dataset[this.copyIndex]]
-        };
-        this.copyIndex++;
-        return;
+    // Merge the arrays
+    while (i <= mid && j <= right) {
+      // Compare elements from both subarrays
+      const result = await this.compare(i, j);
+      
+      if (!result) {
+        // Element from left subarray is smaller
+        this.dataset[k] = this.auxiliaryArray[i];
+        i++;
       } else {
-        this.leftStart = this.rightEnd + 1;
-        
-        if (this.leftStart >= this.dataset.length) {
-          this.size *= 2;
-          this.state = 'start';
-        } else {
-          // Compare boundary elements to ensure we do an operation
-          await this.compare(this.leftStart - 1, this.leftStart);
-          this.state = 'setup';
-        }
+        // Element from right subarray is smaller
+        this.dataset[k] = this.auxiliaryArray[j];
+        j++;
       }
+      
+      // Visualize the placement
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, k],
+        values: [this.dataset[k], this.auxiliaryArray[i-1]]
+      };
+      await sleep(this.stepSpeed);
+      
+      k++;
+    }
+    
+    // Copy the remaining elements of left subarray, if any
+    while (i <= mid) {
+      this.dataset[k] = this.auxiliaryArray[i];
+      
+      // Visualize the copy
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, i],
+        values: [this.dataset[k], this.auxiliaryArray[i]]
+      };
+      await sleep(this.stepSpeed);
+      
+      i++;
+      k++;
+    }
+    
+    // Copy the remaining elements of right subarray, if any
+    while (j <= right) {
+      this.dataset[k] = this.auxiliaryArray[j];
+      
+      // Visualize the copy
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, j],
+        values: [this.dataset[k], this.auxiliaryArray[j]]
+      };
+      await sleep(this.stepSpeed);
+      
+      j++;
+      k++;
     }
   }
 }
 
 // InsertionSort implementation
 class InsertionSort extends SortingAlgorithm {
-  constructor(dataset, stepSpeed) {
-    super(dataset, stepSpeed);
-    this.i = 1; // Start with the second element (index 1)
-    this.j = 0; // Position to compare with
-    this.key = null; // Current element being inserted
-    this.state = 'outer'; // State machine: 'outer', 'inner', 'insert'
-  }
-
-  async step() {
-    if (this.finished) return;
+  async sort() {
+    const n = this.dataset.length;
     
-    // Check if we've finished processing all elements
-    if (this.i >= this.dataset.length) {
-      this.finished = true;
-      return;
-    }
-    
-    // OUTER LOOP - Select new key to insert
-    if (this.state === 'outer') {
-      this.key = this.dataset[this.i];
-      this.j = this.i - 1;
+    for (let i = 1; i < n; i++) {
+      const key = this.dataset[i];
+      let j = i - 1;
       
-      // Perform a comparison to visualize which element we're working with
-      await this.compare(this.i, this.i);
+      // Compare with key element
+      await this.compare(i, i);
       
-      this.state = 'inner';
-      return;
-    }
-    
-    // INNER LOOP - Find insertion position and shift elements
-    if (this.state === 'inner') {
-      // Check if we need to continue the inner loop
-      if (this.j >= 0) {
-        // Compare the key with the current element
-        await this.compare(this.j, this.i);
+      // Move elements greater than key
+      // to one position ahead of their current position
+      while (j >= 0) {
+        // Compare with current element
+        await this.compare(j, i);
         
-        // If current element is greater than key, shift it right
-        if (this.dataset[this.j] > this.key) {
-          this.dataset[this.j + 1] = this.dataset[this.j];
-          await this.swap(this.j, this.j + 1);
-          this.j--; // Move left to continue comparing
-          return;
+        if (this.dataset[j] > key) {
+          // Shift element to the right
+          this.dataset[j + 1] = this.dataset[j];
+          
+          // Visualize the shift
+          this.swaps++;
+          this.currentStep++;
+          this.lastOperation = {
+            type: 'swap',
+            indices: [j, j + 1],
+            values: [this.dataset[j], this.dataset[j]]
+          };
+          await sleep(this.stepSpeed);
+          
+          j--;
         } else {
-          // Found the insertion position
-          this.state = 'insert';
-          return;
+          break;
         }
-      } else {
-        // Reached the beginning of the array
-        this.state = 'insert';
-        return;
       }
-    }
-    
-    // INSERT - Place the key at its correct position
-    if (this.state === 'insert') {
-      // The position to insert is j+1
-      if (this.dataset[this.j + 1] !== this.key) {
-        const oldValue = this.dataset[this.j + 1];
-        this.dataset[this.j + 1] = this.key;
+      
+      // Insert the key at the correct position
+      if (this.dataset[j + 1] !== key) {
+        const oldValue = this.dataset[j + 1];
+        this.dataset[j + 1] = key;
         
         // Visualize the insertion
+        this.swaps++;
+        this.currentStep++;
         this.lastOperation = {
           type: 'swap',
-          indices: [this.j + 1, -1], // -1 signifies special "from key" operation
-          values: [oldValue, this.key]
+          indices: [j + 1, i],
+          values: [oldValue, key]
         };
-        //this.swaps++;
-        //this.currentStep++;
-      } else {
-        // If the key is already in the right position, still visualize it
-        await this.compare(this.j + 1, this.j + 1);
+        await sleep(this.stepSpeed);
       }
-      
-      // Move to the next element in the outer loop
-      this.i++;
-      this.state = 'outer';
-      return;
     }
   }
 }
 
 // SelectionSort implementation
 class SelectionSort extends SortingAlgorithm {
-  constructor(dataset, stepSpeed) {
-    super(dataset, stepSpeed);
-    this.i = 0;
-    this.j = 0;
-    this.minIndex = 0;
-    this.state = 'init';
-  }
-
-  async step() {
-    if (this.finished) return;
+  async sort() {
+    const n = this.dataset.length;
     
-    if (this.i >= this.dataset.length - 1) {
-      this.finished = true;
-      return;
-    }
-    
-    // Initialize for a new pass
-    if (this.state === 'init') {
-      // Always do a comparison, even if we're just comparing an element with itself
-      await this.compare(this.i, this.i);
-      this.minIndex = this.i;
-      this.j = this.i + 1;
-      this.state = 'compare';
-      return;
-    }
-    
-    // Compare current element with minimum
-    if (this.state === 'compare') {
-      if (this.j < this.dataset.length) {
-        await this.compare(this.minIndex, this.j);
-        this.state = 'update-min';
-        return;
-      } else {
-        // Start swap phase when all elements compared
-        this.state = 'swap';
-        // Don't call step() recursively, just return and let the next call handle it
-        return;
-      }
-    }
-    
-    // Check if we need to update the minimum index
-    if (this.state === 'update-min') {
-      if (this.lastOperation && this.lastOperation.type === 'comparison') {
-        const shouldUpdate = this.dataset[this.j] < this.dataset[this.minIndex];
-        if (shouldUpdate) {
-          this.minIndex = this.j;
+    for (let i = 0; i < n - 1; i++) {
+      // Assume the current index has the minimum value
+      let minIndex = i;
+      
+      // Find the minimum element in the unsorted part of the array
+      for (let j = i + 1; j < n; j++) {
+        // Compare current element with current minimum
+        const isLess = !(await this.compare(minIndex, j));
+        
+        if (isLess) {
+          minIndex = j;
         }
       }
-      this.j++;
-      this.state = 'compare';
-      return;
-    }
-    
-    // Swap phase - always swap, even if it's the same element
-    if (this.state === 'swap') {
-      await this.swap(this.i, this.minIndex);
-      this.i++;
-      this.state = 'init';
-      return;
+      
+      // Swap the found minimum element with the first element
+      if (minIndex !== i) {
+        await this.swap(i, minIndex);
+      } else {
+        // Even if no swap is needed, show a comparison for visualization purposes
+        await this.compare(i, i);
+      }
     }
   }
 }

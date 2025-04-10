@@ -51,7 +51,6 @@ exports.startRace = async (io, socket, roomCode, room) => {
       startTime: Date.now(),
       stepSpeed: room.stepSpeed,
       finishedAlgorithms: [],
-      raceInterval: null,
       bets: getBetsForRoom(roomCode)
     });
     
@@ -62,11 +61,11 @@ exports.startRace = async (io, socket, roomCode, room) => {
       dataset
     });
     
-    // Start the race steps
+    // Start all the sorting algorithms asynchronously
     const race = activeRaces.get(roomCode);
-    race.raceInterval = setInterval(() => {
-      executeRaceStep(io, roomCode);
-    }, room.stepSpeed);
+    
+    // Start the algorithms and set up regular update broadcasts
+    await runRaceAlgorithms(io, roomCode, race);
     
   } catch (error) {
     console.error('Error starting race:', error);
@@ -74,43 +73,55 @@ exports.startRace = async (io, socket, roomCode, room) => {
   }
 };
 
-// Execute one step of the race
-const executeRaceStep = async (io, roomCode) => {
-  const race = activeRaces.get(roomCode);
-  
-  if (!race) {
-    return;
+// Run all the algorithms and broadcast updates
+const runRaceAlgorithms = async (io, roomCode, race) => {
+  try {
+    // Set up a regular interval to broadcast the current state
+    const updateInterval = setInterval(() => {
+      broadcastRaceUpdate(io, roomCode, race);
+    }, Math.min(100, race.stepSpeed)); // Update regularly, but not more than 10 times per second
+    
+    // Start each algorithm and handle completion
+    const algorithmPromises = Object.entries(race.algorithms).map(async ([type, algorithm]) => {
+      try {
+        // Start the algorithm
+        await algorithm.run();
+        
+        // When algorithm finishes, record it
+        const position = race.finishedAlgorithms.push(type);
+        
+        // Notify clients about algorithm completion
+        io.to(roomCode).emit('algorithm_finished', {
+          type,
+          position,
+          steps: algorithm.currentStep,
+          comparisons: algorithm.comparisons,
+          swaps: algorithm.swaps
+        });
+        
+        // Check if all algorithms are done
+        if (race.finishedAlgorithms.length === Object.keys(race.algorithms).length) {
+          clearInterval(updateInterval);
+          await finalizeRace(io, roomCode);
+        }
+      } catch (error) {
+        console.error(`Error running algorithm ${type}:`, error);
+      }
+    });
+    
+    // No need to await all promises, let them run independently
+  } catch (error) {
+    console.error('Error running race algorithms:', error);
   }
-  
-  let allFinished = true;
+};
+
+// Broadcast the current state of all algorithms
+const broadcastRaceUpdate = (io, roomCode, race) => {
   const updates = {};
   
-  // Execute one step for each algorithm
+  // Get current state of each algorithm
   for (const [type, algorithm] of Object.entries(race.algorithms)) {
-    // Skip if already finished
-    if (algorithm.finished) {
-      continue;
-    }
-    
-    // Execute step
-    algorithm.step();
-    
-    // Get current state
     updates[type] = algorithm.getState();
-    
-    // Check if just finished
-    if (algorithm.finished && !race.finishedAlgorithms.includes(type)) {
-      race.finishedAlgorithms.push(type);
-      io.to(roomCode).emit('algorithm_finished', {
-        type,
-        position: race.finishedAlgorithms.length,
-        steps: algorithm.currentStep,
-        comparisons: algorithm.comparisons,
-        swaps: algorithm.swaps
-      });
-    }
-    
-    allFinished = allFinished && algorithm.finished;
   }
   
   // Broadcast updates to all clients in the room
@@ -118,12 +129,6 @@ const executeRaceStep = async (io, roomCode) => {
     roomCode,
     updates
   });
-  
-  // Check if race is complete
-  if (allFinished) {
-    clearInterval(race.raceInterval);
-    await finalizeRace(io, roomCode);
-  }
 };
 
 // Finalize the race and update scores
@@ -216,8 +221,14 @@ exports.getRaceStatus = (roomCode) => {
 exports.stopRace = (roomCode) => {
   const race = activeRaces.get(roomCode);
   
-  if (race && race.raceInterval) {
-    clearInterval(race.raceInterval);
+  if (race) {
+    // Stop all algorithms
+    for (const algorithm of Object.values(race.algorithms)) {
+      if (algorithm.isRunning) {
+        algorithm.pause();
+      }
+    }
+    
     activeRaces.delete(roomCode);
   }
 };
