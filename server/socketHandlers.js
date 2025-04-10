@@ -1,6 +1,6 @@
 const { getModel, generateRoomCode } = require('./config/db');
-const { startRace, getRaceStatus, stopRace } = require('./controllers/race');
-const { getAllBetsForRoom, placeBet, clearRoomBets } = require('./controllers/bets');
+const { startRace, getRaceStatus, stopRace, placeBet, updateRaceStepSpeed } = require('./controllers/race');
+const { getAllBetsForRoom, clearRoomBets } = require('./controllers/bets');
 
 // Store active socket connections by user
 const activeConnections = new Map();
@@ -658,6 +658,56 @@ const registerSocketHandlers = (io) => {
       } catch (error) {
         console.error('Error updating settings:', error);
         socket.emit('room_error', { message: 'Server error' });
+      }
+    });
+    
+    // Handle step speed update during race
+    socket.on('update_race_speed', ({ roomCode, stepSpeed }) => {
+      try {
+        const Room = getModel('Room');
+        
+        // Validate input
+        if (!roomCode || !roomCode.trim()) {
+          socket.emit('race_error', { message: 'Room code is required' });
+          return;
+        }
+        
+        if (typeof stepSpeed !== 'number' || stepSpeed < 0) {
+          socket.emit('race_error', { message: 'Invalid step speed value' });
+          return;
+        }
+        
+        // Normalize room code
+        const normalizedRoomCode = roomCode.trim().toUpperCase();
+        
+        // Check if user is the host (we'll do this async while getting the room)
+        Room.findOne({ code: normalizedRoomCode }).then(room => {
+          if (!room) {
+            socket.emit('race_error', { message: 'Room not found' });
+            return;
+          }
+          
+          // Check if user is the host
+          if (room.host !== socket.id) {
+            socket.emit('race_error', { message: 'Only host can update race speed' });
+            return;
+          }
+          
+          // Check if room is racing
+          if (room.status !== 'racing') {
+            socket.emit('race_error', { message: 'Room is not currently racing' });
+            return;
+          }
+          
+          // Update step speed
+          updateRaceStepSpeed(io, socket, normalizedRoomCode, stepSpeed);
+        }).catch(error => {
+          console.error('Error checking room for step speed update:', error);
+          socket.emit('race_error', { message: 'Server error' });
+        });
+      } catch (error) {
+        console.error('Error updating race step speed:', error);
+        socket.emit('race_error', { message: 'Server error' });
       }
     });
     

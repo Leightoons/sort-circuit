@@ -49,7 +49,7 @@ const Room = () => {
     results, 
     error, 
     clearError, 
-    leaveCurrentRoom 
+    leaveCurrentRoom
   } = useContext(RoomContext);
   
   const [selectedAlgorithm, setSelectedAlgorithm] = useState('');
@@ -70,6 +70,9 @@ const Room = () => {
     selection: false,
     heap: false
   });
+  
+  // Add a new state for live speed control
+  const [liveSpeed, setLiveSpeed] = useState(settingsForm.stepSpeed || 100);
   
   // Sync algorithm selection with current algorithms
   useEffect(() => {
@@ -122,6 +125,44 @@ const Room = () => {
       navigate(`/room/${currentRoom}`);
     }
   }, [currentRoom, roomCode, navigate]);
+  
+  // Update liveSpeed whenever settings change
+  useEffect(() => {
+    if (settingsForm && settingsForm.stepSpeed) {
+      setLiveSpeed(settingsForm.stepSpeed);
+    }
+  }, [settingsForm]);
+  
+  // Add handler for changing race speed during the race
+  const handleLiveSpeedChange = (e) => {
+    const newSpeed = parseInt(e.target.value, 10);
+    setLiveSpeed(newSpeed);
+    
+    if (socket) {
+      socket.emit('update_race_speed', {
+        roomCode,
+        stepSpeed: newSpeed
+      });
+    }
+  };
+  
+  // Add event listener for race speed updates
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleRaceSpeedUpdated = (data) => {
+      if (data.roomCode === roomCode) {
+        setLiveSpeed(data.stepSpeed);
+        console.log(`Race speed updated to ${data.stepSpeed}ms`);
+      }
+    };
+    
+    socket.on('race_speed_updated', handleRaceSpeedUpdated);
+    
+    return () => {
+      socket.off('race_speed_updated', handleRaceSpeedUpdated);
+    };
+  }, [socket, roomCode]);
   
   // Handle betting
   const handlePlaceBet = () => {
@@ -570,6 +611,35 @@ const Room = () => {
     );
   };
   
+  // Add live speed control UI component
+  const renderLiveSpeedControl = () => {
+    const isUserHost = isHost || (socket && players.some(p => p.socketId === socket.id && p.isHost));
+    if (!isUserHost || roomStatus !== 'racing') return null;
+    
+    return (
+      <div className="live-speed-control">
+        <h3>Live Speed Control</h3>
+        <div className="form-group">
+          <label htmlFor="liveSpeed">Algorithm Speed (ms)</label>
+          <input
+            type="range"
+            id="liveSpeed"
+            name="liveSpeed"
+            min="0"
+            max="500"
+            step="50"
+            value={liveSpeed}
+            onChange={handleLiveSpeedChange}
+          />
+          <span>{liveSpeed}ms</span>
+        </div>
+        <p className="speed-info">
+          <i className="fas fa-info-circle"></i> Changes apply immediately to all algorithms
+        </p>
+      </div>
+    );
+  };
+  
   if (!currentRoom) {
     return <div className="loading">Loading room...</div>;
   }
@@ -618,7 +688,7 @@ const Room = () => {
         </ul>
       </div>
       
-      {/* Always show host controls for the host regardless of room status */}
+      {/* Modify the host controls section to show speed control during race */}
       {(isHost || (socket && players.some(p => p.socketId === socket.id && p.isHost))) && (
         <div className="host-controls">
           <div className="host-notice">
@@ -636,6 +706,7 @@ const Room = () => {
               Start Race
             </button>
           )}
+          {roomStatus === 'racing' && renderLiveSpeedControl()}
         </div>
       )}
       

@@ -267,10 +267,45 @@ const getBetsForRoom = (roomCode) => {
   return roomBets;
 };
 
+// @desc    Update step speed during a race
+// @access  Server-only
+exports.updateRaceStepSpeed = (io, socket, roomCode, newStepSpeed) => {
+  try {
+    // Get the active race
+    const race = activeRaces.get(roomCode);
+    
+    if (!race) {
+      socket.emit('race_error', { message: 'No active race found' });
+      return false;
+    }
+    
+    // Update the race step speed
+    race.stepSpeed = newStepSpeed;
+    
+    // Update the step speed for all algorithms
+    for (const algorithm of Object.values(race.algorithms)) {
+      algorithm.stepSpeed = newStepSpeed;
+    }
+    
+    // Broadcast the step speed change to all clients
+    io.to(roomCode).emit('race_speed_updated', {
+      roomCode,
+      stepSpeed: newStepSpeed
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating race step speed:', error);
+    socket.emit('race_error', { message: 'Server error' });
+    return false;
+  }
+};
+
 module.exports = {
   startRace: exports.startRace,
   getRaceStatus: exports.getRaceStatus,
   stopRace: exports.stopRace,
   placeBet: exports.placeBet,
+  updateRaceStepSpeed: exports.updateRaceStepSpeed,
   getBetsForRoom
 }; 
