@@ -3,6 +3,35 @@ import SocketContext from './SocketContext';
 
 const RoomContext = createContext();
 
+/**
+ * Creates a race event handler that follows common patterns
+ * @param {string} eventName - The event name for logging
+ * @param {function} updateFn - Function that receives prevData and eventData and returns new state
+ * @returns {function} - The event handler function
+ */
+const createRaceEventHandler = (eventName, updateFn) => (eventData) => {
+  // Get access to socket and setRaceData from closure
+  return (socket, setRaceData) => {
+    // Skip updates during transition periods
+    if (socket._ignoreRaceEvents) {
+      console.log(`Ignoring ${eventName} during transition`);
+      return;
+    }
+    
+    setRaceData((prevData) => {
+      // If prevData is null, we can't process the update
+      if (!prevData) return null;
+      
+      try {
+        return updateFn(prevData, eventData);
+      } catch (error) {
+        console.error(`Error processing ${eventName}:`, error);
+        return prevData; // Return unchanged state on error
+      }
+    });
+  };
+};
+
 export const RoomProvider = ({ children }) => {
   const [currentRoom, setCurrentRoom] = useState(null);
   const [isHost, setIsHost] = useState(false);

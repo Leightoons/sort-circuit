@@ -1,6 +1,8 @@
 const { getModel, generateRoomCode } = require('./config/db');
 const { startRace, getRaceStatus, stopRace, placeBet, updateRaceStepSpeed, endRaceEarly } = require('./controllers/race');
 const { getAllBetsForRoom, clearRoomBets } = require('./controllers/bets');
+const { validateRoom, requireHostPermission, validateRoomStatus } = require('./utils/validationUtils');
+const { reassignRoomHost, handleEmptyRoom } = require('./utils/roomUtils');
 
 // Store active socket connections by user
 const activeConnections = new Map();
@@ -584,19 +586,10 @@ const registerSocketHandlers = (io) => {
     // Handle race start
     socket.on('start_race', async ({ roomCode }) => {
       try {
-        const Room = getModel('Room');
-        const room = await Room.findOne({ code: roomCode });
+        const room = await validateRoom(roomCode, socket);
+        if (!room) return;
         
-        if (!room) {
-          socket.emit('race_error', { message: 'Room not found' });
-          return;
-        }
-        
-        // Check if user is the host
-        if (room.host !== socket.id) {
-          socket.emit('race_error', { message: 'Only host can start the race' });
-          return;
-        }
+        if (!requireHostPermission(room, socket, 'Only host can start the race')) return;
         
         // Update room status
         room.status = 'racing';
@@ -745,10 +738,7 @@ const registerSocketHandlers = (io) => {
           }
           
           // End the race early
-        {
           await endRaceEarly(io, socket, normalizedRoomCode);
-          await stopRace(normalizedRoomCode);
-        }
         }).catch(error => {
           console.error('Error checking room for ending race early:', error);
           socket.emit('race_error', { message: 'Server error' });
@@ -762,25 +752,12 @@ const registerSocketHandlers = (io) => {
     // Handle reset room state
     socket.on('reset_room_state', async ({ roomCode }) => {
       try {
-        const Room = getModel('Room');
-        const room = await Room.findOne({ code: roomCode });
+        const room = await validateRoom(roomCode, socket);
+        if (!room) return;
         
-        if (!room) {
-          socket.emit('room_error', { message: 'Room not found' });
-          return;
-        }
+        if (!requireHostPermission(room, socket, 'Only host can reset the room')) return;
         
-        // Check if user is the host
-        if (room.host !== socket.id) {
-          socket.emit('room_error', { message: 'Only host can reset the room' });
-          return;
-        }
-        
-        // Only allow reset if room is in 'finished' state
-        if (room.status !== 'finished') {
-          socket.emit('room_error', { message: 'Can only reset finished races' });
-          return;
-        }
+        if (!validateRoomStatus(room, 'finished', socket, 'Can only reset finished races')) return;
         
         // Update room status to waiting
         room.status = 'waiting';
@@ -823,90 +800,12 @@ const registerSocketHandlers = (io) => {
         const Room = getModel('Room');
         const room = await Room.findOne({ code: roomCode });
         if (room && room.host === socket.id) {
-          // Get all sockets in the room
-          const socketsInRoom = await io.in(room.code).fetchSockets();
+          // Try to reassign the host
+          const hostReassigned = await reassignRoomHost(io, room, socket.id, socketUsernames);
           
-          if (socketsInRoom.length > 0 || (room.players && room.players.length > 1)) {
-            // If sockets are found in the room, assign one as the new host
-            if (socketsInRoom.length > 0) {
-              // Assign a new host
-              const newHostSocket = socketsInRoom[0];
-              const newHostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
-              room.host = newHostSocket.id;
-              room.hostUsername = newHostUsername;
-              await room.save();
-              
-              // Notify the new host
-              io.to(newHostSocket.id).emit('host_assigned', { roomCode: room.code });
-              
-              // Notify all users in the room about the new host
-              io.to(room.code).emit('host_changed', {
-                socketId: newHostSocket.id,
-                username: newHostUsername
-              });
-
-              console.log(`[DISCONNECT] Reassigned host in room ${room.code} from ${socket.username} to ${newHostUsername}`);
-            }
-            // If no sockets found but there are still players in the room (other than the disconnecting one)
-            else if (room.players.length > 1) {
-              // Find a player who isn't the disconnecting socket
-              const newHostPlayer = room.players.find(p => p.socketId !== socket.id);
-              if (newHostPlayer) {
-                room.host = newHostPlayer.socketId;
-                room.hostUsername = newHostPlayer.username;
-                await room.save();
-                
-                console.log(`[DISCONNECT] Assigned new host ${newHostPlayer.username} from players array in room ${room.code}`);
-                
-                // Try to notify the new host
-                io.to(newHostPlayer.socketId).emit('host_assigned', { roomCode: room.code });
-                
-                // Notify all users in the room about the new host
-                io.to(room.code).emit('host_changed', {
-                  socketId: newHostPlayer.socketId,
-                  username: newHostPlayer.username
-                });
-              }
-            }
-          } else {
-            // No users left, but don't delete immediately - set a flag for pending deletion
-            console.log(`[DISCONNECT] Room ${room.code} has no active users, marking for potential deletion`);
-            
-            // Set a deletion flag and timestamp
-            room.pendingDeletion = true;
-            room.deletionTimestamp = Date.now();
-            await room.save();
-            
-            // Schedule a check after 10 seconds to see if anyone rejoined
-            setTimeout(async () => {
-              try {
-                // Check if room still exists
-                const checkRoom = await Room.findOne({ code: room.code });
-                if (!checkRoom) return; // Room already deleted
-                
-                // Check if it still has the deletion flag
-                if (!checkRoom.pendingDeletion) return; // Flag was removed
-                
-                // Check if anyone is in the room now
-                const currentSockets = await io.in(room.code).fetchSockets();
-                if (currentSockets.length > 0) {
-                  // Someone joined, cancel deletion
-                  console.log(`[DISCONNECT] Cancelling deletion of room ${room.code} - users are present`);
-                  checkRoom.pendingDeletion = false;
-                  await checkRoom.save();
-                  return;
-                }
-                
-                // If we reached here, the room is still empty after the delay
-                console.log(`[DISCONNECT] Deleting empty room ${room.code} after waiting period`);
-                await Room.findOneAndDelete({ _id: checkRoom._id });
-                
-                // Clean up any active races
-                stopRace(room.code);
-              } catch (err) {
-                console.error(`[DISCONNECT] Error in delayed room deletion check: ${err.message}`);
-              }
-            }, 10000); // Wait 10 seconds
+          // If no new host was found, handle potential room deletion
+          if (!hostReassigned) {
+            await handleEmptyRoom(io, Room, room, stopRace);
           }
         }
         
@@ -929,90 +828,12 @@ const registerSocketHandlers = (io) => {
         const hostedRooms = await Room.find({ host: socket.id });
         
         for (const room of hostedRooms) {
-          // Get all sockets in the room
-          const socketsInRoom = await io.in(room.code).fetchSockets();
+          // Try to reassign the host
+          const hostReassigned = await reassignRoomHost(io, room, socket.id, socketUsernames);
           
-          if (socketsInRoom.length > 0 || (room.players && room.players.length > 1)) {
-            // If sockets are found in the room, assign one as the new host
-            if (socketsInRoom.length > 0) {
-              // Assign a new host
-              const newHostSocket = socketsInRoom[0];
-              const newHostUsername = socketUsernames.get(newHostSocket.id) || 'New Host';
-              room.host = newHostSocket.id;
-              room.hostUsername = newHostUsername;
-              await room.save();
-              
-              // Notify the new host
-              io.to(newHostSocket.id).emit('host_assigned', { roomCode: room.code });
-              
-              // Notify all users in the room about the new host
-              io.to(room.code).emit('host_changed', {
-                socketId: newHostSocket.id,
-                username: newHostUsername
-              });
-
-              console.log(`[DISCONNECT] Reassigned host in room ${room.code} from ${disconnectedUsername} to ${newHostUsername}`);
-            }
-            // If no sockets found but there are still players in the room (other than the disconnecting one)
-            else if (room.players.length > 1) {
-              // Find a player who isn't the disconnecting socket
-              const newHostPlayer = room.players.find(p => p.socketId !== socket.id);
-              if (newHostPlayer) {
-                room.host = newHostPlayer.socketId;
-                room.hostUsername = newHostPlayer.username;
-                await room.save();
-                
-                console.log(`[DISCONNECT] Assigned new host ${newHostPlayer.username} from players array in room ${room.code}`);
-                
-                // Try to notify the new host
-                io.to(newHostPlayer.socketId).emit('host_assigned', { roomCode: room.code });
-                
-                // Notify all users in the room about the new host
-                io.to(room.code).emit('host_changed', {
-                  socketId: newHostPlayer.socketId,
-                  username: newHostPlayer.username
-                });
-              }
-            }
-          } else {
-            // No users left, but don't delete immediately - set a flag for pending deletion
-            console.log(`[DISCONNECT] Room ${room.code} has no active users, marking for potential deletion`);
-            
-            // Set a deletion flag and timestamp
-            room.pendingDeletion = true;
-            room.deletionTimestamp = Date.now();
-            await room.save();
-            
-            // Schedule a check after 10 seconds to see if anyone rejoined
-            setTimeout(async () => {
-              try {
-                // Check if room still exists
-                const checkRoom = await Room.findOne({ code: room.code });
-                if (!checkRoom) return; // Room already deleted
-                
-                // Check if it still has the deletion flag
-                if (!checkRoom.pendingDeletion) return; // Flag was removed
-                
-                // Check if anyone is in the room now
-                const currentSockets = await io.in(room.code).fetchSockets();
-                if (currentSockets.length > 0) {
-                  // Someone joined, cancel deletion
-                  console.log(`[DISCONNECT] Cancelling deletion of room ${room.code} - users are present`);
-                  checkRoom.pendingDeletion = false;
-                  await checkRoom.save();
-                  return;
-                }
-                
-                // If we reached here, the room is still empty after the delay
-                console.log(`[DISCONNECT] Deleting empty room ${room.code} after waiting period`);
-                await Room.findOneAndDelete({ _id: checkRoom._id });
-                
-                // Clean up any active races
-                stopRace(room.code);
-              } catch (err) {
-                console.error(`[DISCONNECT] Error in delayed room deletion check: ${err.message}`);
-              }
-            }, 10000); // Wait 10 seconds
+          // If no new host was found, handle potential room deletion
+          if (!hostReassigned) {
+            await handleEmptyRoom(io, Room, room, stopRace);
           }
         }
         

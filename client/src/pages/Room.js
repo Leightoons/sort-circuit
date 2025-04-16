@@ -3,35 +3,36 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
 import Notifications from '../components/layout/Notifications';
+import { ALGORITHM_ORDER, ALGORITHM_NAMES, getAlgorithmDisplayName } from '../constants/algorithms';
 
 // Define the preferred algorithm display order
-const ALGORITHM_ORDER = {
-  'bubble': 1,
-  'insertion': 2,
-  'selection': 3,
-  'heap': 4,
-  'inplacestable': 5,
-  'merge': 6,
-  'quick': 7,
-  'bogo': 8
-};
+// const ALGORITHM_ORDER = {
+//   'bubble': 1,
+//   'insertion': 2,
+//   'selection': 3,
+//   'heap': 4,
+//   'inplacestable': 5,
+//   'merge': 6,
+//   'quick': 7,
+//   'bogo': 8
+// };
 
 // Define proper display names for each algorithm
-const ALGORITHM_NAMES = {
-  'bubble': 'Bubble Sort',
-  'insertion': 'Insertion Sort',
-  'selection': 'Selection Sort',
-  'inplacestable': 'In-Place Stable Sort',
-  'merge': 'Merge Sort',
-  'quick': 'Quick Sort',
-  'heap': 'Heap Sort',
-  'bogo': 'Bogo Sort'
-};
+// const ALGORITHM_NAMES = {
+//   'bubble': 'Bubble Sort',
+//   'insertion': 'Insertion Sort',
+//   'selection': 'Selection Sort',
+//   'inplacestable': 'In-Place Stable Sort',
+//   'merge': 'Merge Sort',
+//   'quick': 'Quick Sort',
+//   'heap': 'Heap Sort',
+//   'bogo': 'Bogo Sort'
+// };
 
 // Helper function to get the display name for an algorithm
-const getAlgorithmDisplayName = (algorithmId) => {
-  return ALGORITHM_NAMES[algorithmId] || algorithmId.charAt(0).toUpperCase() + algorithmId.slice(1) + ' Sort';
-};
+// const getAlgorithmDisplayName = (algorithmId) => {
+//   return ALGORITHM_NAMES[algorithmId] || algorithmId.charAt(0).toUpperCase() + algorithmId.slice(1) + ' Sort';
+// };
 
 const Room = () => {
   const { roomCode } = useParams();

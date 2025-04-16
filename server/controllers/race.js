@@ -79,7 +79,7 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
     // Set up a regular interval to broadcast the current state
     const updateInterval = setInterval(() => {
       broadcastRaceUpdate(io, roomCode, race);
-    }, Math.min(100, race.stepSpeed)); // Update regularly, but not more than 10 times per second
+    }, Math.min(0, race.stepSpeed));
     
     // Store the interval reference in the race object so it can be cleared when ending early
     race.updateInterval = updateInterval;
@@ -136,6 +136,33 @@ const broadcastRaceUpdate = (io, roomCode, race) => {
   });
 };
 
+/**
+ * Calculates results for a single algorithm
+ * @param {object} algorithm - The algorithm instance
+ * @param {string} type - The algorithm type
+ * @param {object} race - The race data
+ * @param {Array} stoppedAlgorithms - List of algorithms that were stopped early
+ * @param {string} winnerAlgorithm - The winning algorithm type
+ * @returns {object} - The algorithm results
+ */
+const calculateAlgorithmResult = (algorithm, type, race, stoppedAlgorithms, winnerAlgorithm) => {
+  // Find the position in finished algorithms
+  const position = race.finishedAlgorithms.indexOf(type) + 1;
+  
+  // Only mark as stopped early if this algorithm was explicitly stopped
+  // Not just because it wasn't the winner in an early ended race
+  const wasStoppedEarly = stoppedAlgorithms.includes(type);
+  
+  return {
+    position,
+    steps: algorithm.currentStep,
+    comparisons: algorithm.comparisons,
+    swaps: algorithm.swaps,
+    isWinner: type === winnerAlgorithm,
+    stoppedEarly: wasStoppedEarly
+  };
+};
+
 // Finalize the race and update scores
 const finalizeRace = async (io, roomCode) => {
   try {
@@ -178,20 +205,9 @@ const finalizeRace = async (io, roomCode) => {
     // Get final results with performance metrics
     const results = {};
     for (const [type, algorithm] of Object.entries(race.algorithms)) {
-      const isFinished = race.finishedAlgorithms.includes(type);
-      
       // Only mark as stopped early if this algorithm was explicitly stopped
       // Not just because it wasn't the winner in an early ended race
-      const wasStoppedEarly = stoppedAlgorithms.includes(type);
-      
-      results[type] = {
-        position: race.finishedAlgorithms.indexOf(type) + 1,
-        steps: algorithm.currentStep,
-        comparisons: algorithm.comparisons,
-        swaps: algorithm.swaps,
-        isWinner: type === winnerAlgorithm,
-        stoppedEarly: wasStoppedEarly
-      };
+      results[type] = calculateAlgorithmResult(algorithm, type, race, stoppedAlgorithms, winnerAlgorithm);
     }
     
     // Broadcast race results
@@ -204,12 +220,23 @@ const finalizeRace = async (io, roomCode) => {
     });
     
     // Clean up
-    activeRaces.delete(roomCode);
-    clearRoomBets(roomCode);
+    cleanupRace(roomCode);
     
   } catch (error) {
     console.error('Error finalizing race:', error);
   }
+};
+
+/**
+ * Cleans up a race, removing it from memory and clearing bets
+ * @param {string} roomCode - The room code
+ */
+const cleanupRace = (roomCode) => {
+  // Remove from active races
+  activeRaces.delete(roomCode);
+  
+  // Clear bets for the room
+  clearRoomBets(roomCode);
 };
 
 // @desc    Get active race status
@@ -245,7 +272,8 @@ exports.stopRace = (roomCode) => {
       }
     }
     
-    activeRaces.delete(roomCode);
+    // Clean up race resources
+    cleanupRace(roomCode);
   }
 };
 

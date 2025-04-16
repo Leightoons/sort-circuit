@@ -1,0 +1,28 @@
+// Define the preferred algorithm display order
+export const ALGORITHM_ORDER = {
+  'bubble': 1,
+  'insertion': 2,
+  'selection': 3,
+  'heap': 4,
+  'inplacestable': 5,
+  'merge': 6,
+  'quick': 7,
+  'bogo': 8
+};
+
+// Define proper display names for each algorithm
+export const ALGORITHM_NAMES = {
+  'bubble': 'Bubble Sort',
+  'insertion': 'Insertion Sort',
+  'selection': 'Selection Sort',
+  'inplacestable': 'In-Place Stable Sort',
+  'merge': 'Merge Sort',
+  'quick': 'Quick Sort',
+  'heap': 'Heap Sort',
+  'bogo': 'Bogo Sort'
+};
+
+// Helper function to get the display name for an algorithm
+export const getAlgorithmDisplayName = (algorithmId) => {
+  return ALGORITHM_NAMES[algorithmId] || algorithmId.charAt(0).toUpperCase() + algorithmId.slice(1) + ' Sort';
+}; 
