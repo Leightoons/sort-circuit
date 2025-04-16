@@ -321,7 +321,7 @@ class InPlaceStableSort extends SortingAlgorithm {
   
   // Merge two adjacent sorted subarrays
   async merge(from, pivot, to, len1, len2) {
-    await sleep(this.stepSpeed); // Visualize the recursive structure
+    //await sleep(this.stepSpeed); // Visualize the recursive structure
     
     if (len1 === 0 || len2 === 0) return;
     
@@ -591,15 +591,17 @@ class MergeSort extends SortingAlgorithm {
       
       if (this.auxArray[i] <= this.auxArray[j]) {
         // Element from first subarray is smaller
+        //await this.swap(i, k);
         this.dataset[k] = this.auxArray[i];
         i++;
       } else {
         // Element from second subarray is smaller
+        //await this.swap(i, k);
         this.dataset[k] = this.auxArray[j];
         j++;
       }
       
-      // Visualize the placement
+       // Visualize the placement
       this.swaps++;
       this.currentStep++;
       this.lastOperation = {
@@ -610,7 +612,8 @@ class MergeSort extends SortingAlgorithm {
       await sleep(this.stepSpeed);
       
       k++;
-    }
+      
+    } 
     
     // Copy remaining elements from first subarray
     while (i <= mid) {
