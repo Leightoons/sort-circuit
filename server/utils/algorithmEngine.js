@@ -8,7 +8,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Base class for all sorting algorithms
 class SortingAlgorithm {
-  constructor(dataset, stepSpeed = 500) {
+  constructor(dataset, stepSpeed = 250) {
     this.dataset = [...dataset]; // Clone the array to avoid modifying the original
     this.stepSpeed = stepSpeed;
     this.comparisons = 0;

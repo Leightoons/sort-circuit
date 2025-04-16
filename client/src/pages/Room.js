@@ -60,7 +60,7 @@ const Room = () => {
     datasetSize: 20,
     allowDuplicates: false,
     valueRange: { min: 1, max: 100 },
-    stepSpeed: 500
+    stepSpeed: 250
   });
   
   // State for algorithm selection
@@ -678,7 +678,7 @@ const Room = () => {
               id="stepSpeed"
               name="stepSpeed"
               min="0"
-              max="500"
+              max="1000"
               step="50"
               value={settingsForm.stepSpeed}
               onChange={handleSettingsChange}
@@ -709,7 +709,7 @@ const Room = () => {
             id="liveSpeed"
             name="liveSpeed"
             min="0"
-            max="500"
+            max="1000"
             step="50"
             value={liveSpeed}
             onChange={handleLiveSpeedChange}

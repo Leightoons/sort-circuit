@@ -60,7 +60,7 @@ class Room {
     this.datasetSize = 20;
     this.allowDuplicates = false;
     this.valueRange = { min: 1, max: 100 };
-    this.stepSpeed = 500;
+    this.stepSpeed = 250;
     this.createdAt = new Date();
     this.players = [];
     this.pendingDeletion = false;
