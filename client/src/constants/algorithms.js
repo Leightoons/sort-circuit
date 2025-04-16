@@ -7,7 +7,8 @@ export const ALGORITHM_ORDER = {
   'inplacestable': 5,
   'merge': 6,
   'quick': 7,
-  'bogo': 8
+  'bogo': 8,
+  'stalin': 9
 };
 
 // Define proper display names for each algorithm
@@ -19,7 +20,8 @@ export const ALGORITHM_NAMES = {
   'merge': 'Merge Sort',
   'quick': 'Quick Sort',
   'heap': 'Heap Sort',
-  'bogo': 'Bogo Sort'
+  'bogo': 'Bogo Sort',
+  'stalin': 'Stalin Sort'
 };
 
 // Helper function to get the display name for an algorithm

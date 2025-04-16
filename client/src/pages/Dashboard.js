@@ -12,7 +12,8 @@ const ALGORITHM_NAMES = {
   'merge': 'Merge Sort',
   'quick': 'Quick Sort',
   'heap': 'Heap Sort',
-  'bogo': 'Bogo Sort'
+  'bogo': 'Bogo Sort',
+  'stalin': 'Stalin Sort'
 };
 
 // Helper function to get the display name for an algorithm
@@ -258,6 +259,16 @@ const Dashboard = () => {
                   onChange={() => handleAlgorithmChange('bogo')}
                 />
                 <label htmlFor="bogo">{getAlgorithmDisplayName('bogo')}</label>
+              </div>
+              <div className="algorithm-option">
+                <input
+                  type="checkbox"
+                  id="stalin"
+                  name="stalin"
+                  checked={selectedAlgorithms.includes('stalin')}
+                  onChange={() => handleAlgorithmChange('stalin')}
+                />
+                <label htmlFor="stalin">{getAlgorithmDisplayName('stalin')}</label>
               </div>
             </div>
           </div>

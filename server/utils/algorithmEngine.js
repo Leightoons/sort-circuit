@@ -704,6 +704,49 @@ class BogoSort extends SortingAlgorithm {
   }
 }
 
+/**
+ * Stalin Sort
+ * 
+ * A joke sorting algorithm where elements that are not in order are simply removed.
+ * Named after Joseph Stalin's tendency to "remove" people that did not fit his regime.
+ */
+class StalinSort extends SortingAlgorithm {
+  async sort() {
+    const n = this.dataset.length;
+    if (n <= 1) return; // Already sorted
+    
+    let currentMax = this.dataset[0];
+    let i = 1;
+    
+    while (i < this.dataset.length) {
+      // Compare current element with current maximum
+      await this.compare(i - 1, i);
+      
+      // If current element is less than the current maximum, remove it
+      if (this.dataset[i] < currentMax) {
+        // Mark the removal in our visualization
+        this.swaps++;
+        this.currentStep++;
+        this.lastOperation = {
+          type: 'removal',
+          indices: [i],
+          values: [this.dataset[i]]
+        };
+        
+        // Remove the element (splice is used for visualization purposes)
+        this.dataset.splice(i, 1);
+        
+        // Wait for visualization delay
+        await sleep(this.stepSpeed);
+      } else {
+        // Element stays, update the current maximum
+        currentMax = this.dataset[i];
+        i++;
+      }
+    }
+  }
+}
+
 // Factory function to create appropriate algorithm instance
 const createAlgorithm = (type, dataset, stepSpeed) => {
   switch (type.toLowerCase()) {
@@ -727,6 +770,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'bogo':
       // Bogo sort - highly inefficient random shuffle sort
       return new BogoSort(dataset, stepSpeed);
+    case 'stalin':
+      // Stalin sort - joke sorting algorithm
+      return new StalinSort(dataset, stepSpeed);
     default:
       throw new Error(`Unknown algorithm type: ${type}`);
   }
