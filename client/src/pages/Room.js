@@ -279,8 +279,13 @@ const Room = () => {
     // Ensure we have a valid dataset - if not, use the race dataset
     const visualizationDataset = dataset || (raceData && raceData.dataset ? [...raceData.dataset] : []);
     
+    // Generate a unique key for this visualization based on the algorithm and 
+    // either the cleaned/cleanStart flag or a timestamp to force fresh rendering
+    const visualKey = `${algorithmType}-${raceData.cleanStart || raceData.cleaned ? 'new' : 'current'}-${roomStatus}`;
+    
     return (
       <div 
+        key={visualKey}
         className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${algorithmData.lastOperation ? 'last-updated' : ''} ${stoppedEarly ? 'stopped-early' : ''}`}
         data-algorithm={algorithmType}
       >
@@ -315,13 +320,18 @@ const Room = () => {
         <div className="data-blocks">
           {visualizationDataset && visualizationDataset.map((value, index) => {
             // Determine if this block should be highlighted
-            const isHighlighted = algorithmData.lastOperation && 
+            // Only highlight if the algorithm is still running
+            const isHighlighted = !finished && algorithmData.lastOperation && 
               (algorithmData.lastOperation.indices.includes(index) || 
                algorithmData.lastOperation.type === 'shuffle'); // Highlight all blocks during shuffle
             
             // Choose color based on operation type and alternating flag
             let backgroundColor = undefined;
-            if (isHighlighted) {
+            
+            // If algorithm is finished, use a uniform success color
+            if (finished) {
+              backgroundColor = 'var(--color-success-bars)';
+            } else if (isHighlighted) {
               const { type, alternate } = algorithmData.lastOperation;
               if (type === 'comparison') {
                 backgroundColor = alternate ? 'var(--color-compare-alt)' : 'var(--color-compare)';
@@ -334,7 +344,7 @@ const Room = () => {
             
             return (
               <div 
-                key={index} 
+                key={`${visualKey}-block-${index}`}
                 className="data-block"
                 style={{ 
                   height: `${(value / Math.max(...visualizationDataset)) * 100}%`,

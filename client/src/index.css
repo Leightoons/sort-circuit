@@ -13,10 +13,16 @@
   --color-compare-alt: #ffd700; /* Darker yellow for alternate comparison */
   --color-swap: #ff4081;
   --color-swap-alt: #f50057; /* Darker pink for alternate swap */
+  --color-success-bars: rgba(76, 175, 80, 0.3); /* Light Green for completed algorithms */
   --color-waiting: #9e9e9e;
   --color-racing: #4caf50;
   --color-finished: #2196f3;
   --color-info: #2196f3;
+  --color-danger: #F44336;
+  --color-light: #f8f9fa;
+  --color-dark: #343a40;
+  --color-gray: #6c757d;
+  --color-gray-light: #e9ecef;
 }
 
 * {
@@ -507,7 +513,7 @@ p {
   align-items: flex-end;
   justify-content: center;
   font-size: 0.8rem;
-  border-radius: 2px 2px 0 0;
+  border-radius: 1px 1px 0 0;
   transition: none;
 }
 
@@ -956,7 +962,7 @@ p {
 }
 
 .algorithm-visualization .data-block {
-  transition: height 0.3s ease-out, background-color 0.3s;
+  transition: none;
 }
 
 /* Shuffle animation for bogo sort */

@@ -745,7 +745,10 @@ const registerSocketHandlers = (io) => {
           }
           
           // End the race early
+        {
           await endRaceEarly(io, socket, normalizedRoomCode);
+          await stopRace(normalizedRoomCode);
+        }
         }).catch(error => {
           console.error('Error checking room for ending race early:', error);
           socket.emit('race_error', { message: 'Server error' });

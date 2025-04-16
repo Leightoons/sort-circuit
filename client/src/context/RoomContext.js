@@ -110,144 +110,233 @@ export const RoomProvider = ({ children }) => {
     socket.on('race_started', ({ dataset }) => {
       setRoomStatus('racing');
       
-      // Completely reset race data to ensure no leftover state from previous races
-      // This prevents visualization jitter when starting a new race after ending one early
-      setRaceData({
-        dataset: [...dataset], // Use a new array reference to force re-rendering
-        progress: {},
-        currentStep: 0,
-        endedEarly: false // Reset the ended early flag
-      });
+      // First, clear any existing race data to prevent state contamination
+      setRaceData(null);
+      
+      // Then create a completely fresh race data object in the next tick
+      setTimeout(() => {
+        // Always create a completely new race data object when starting a race
+        // This prevents issues with null prevData and visualization jitter
+        setRaceData({
+          dataset: [...dataset], 
+          progress: {}, // Empty progress object for all algorithms
+          currentStep: 0,
+          endedEarly: false,
+          cleanStart: true // Mark this as a clean start
+        });
+      }, 0);
       
       setResults(null);
     });
 
     // Race update event
     socket.on('race_update', ({ updates }) => {
+      // Skip updates during transition periods
+      if (socket._ignoreRaceEvents) {
+        console.log('Ignoring race update during transition');
+        return;
+      }
+      
       setRaceData((prevData) => {
-        // Create a new progress object starting with previous data
-        const newProgress = { ...prevData.progress };
+        // If prevData is null, we can't process the update
+        if (!prevData) return null;
         
-        // For all algorithms that are not in the current update, clear their lastOperation
-        Object.keys(newProgress).forEach(algo => {
-          if (!updates[algo] && newProgress[algo]) {
-            console.log(`Clearing highlight for ${algo}`);
-            newProgress[algo] = {
-              ...newProgress[algo],
-              lastOperation: null // Clear the highlighting
-            };
-          }
-        });
-        
-        // Process each algorithm update with special handling for repeated operation types
-        const processedUpdates = {};
-        
-        Object.entries(updates).forEach(([algo, update]) => {
-          const currentAlgo = newProgress[algo] || {};
-          const currentOperation = currentAlgo.lastOperation;
-          const newOperation = update.lastOperation;
+        try {
+          // Create a new progress object starting with previous data
+          const newProgress = { ...(prevData.progress || {}) };
           
-          // If there's a new operation for this algorithm
-          if (newOperation) {
-            // Check if it's the same type as the previous operation
-            const isSameOperationType = 
-              currentOperation && 
-              newOperation.type === currentOperation.type &&
-              JSON.stringify(newOperation.indices) !== JSON.stringify(currentOperation.indices);
-            
-            // If same operation type but different indices, add alternating flag
-            if (isSameOperationType) {
-              console.log(`${algo}: Same operation type (${newOperation.type}), alternating highlight`);
-              
-              // Toggle the alternating flag or set it if it doesn't exist
-              const alternateFlag = currentOperation.alternate ? !currentOperation.alternate : true;
-              
-              processedUpdates[algo] = {
-                ...update,
-                lastOperation: {
-                  ...newOperation,
-                  alternate: alternateFlag
-                }
-              };
-            } else {
-              // Different operation type, reset the alternating flag
-              console.log(`${algo}: New operation type (${newOperation.type})`);
-              processedUpdates[algo] = {
-                ...update,
-                lastOperation: {
-                  ...newOperation,
-                  alternate: false
-                }
+          // For all algorithms that are not in the current update, clear their lastOperation
+          Object.keys(newProgress).forEach(algo => {
+            if (!updates[algo] && newProgress[algo]) {
+              console.log(`Clearing highlight for ${algo}`);
+              newProgress[algo] = {
+                ...newProgress[algo],
+                lastOperation: null // Clear the highlighting
               };
             }
-          } else {
-            // No operation, just pass through the update
-            processedUpdates[algo] = update;
-          }
-        });
-        
-        // Now add the processed updates
-        return {
-          ...prevData,
-          progress: {
-            ...newProgress,
-            ...processedUpdates
-          },
-          currentStep: Math.max(
-            ...Object.values(updates).map(u => u.currentStep),
-            prevData.currentStep || 0
-          )
-        };
+          });
+          
+          // Process each algorithm update with special handling for repeated operation types
+          const processedUpdates = {};
+          
+          Object.entries(updates).forEach(([algo, update]) => {
+            const currentAlgo = newProgress[algo] || {};
+            const currentOperation = currentAlgo.lastOperation;
+            const newOperation = update.lastOperation;
+            
+            // If there's a new operation for this algorithm
+            if (newOperation) {
+              // Check if it's the same type as the previous operation
+              const isSameOperationType = 
+                currentOperation && 
+                newOperation.type === currentOperation.type &&
+                JSON.stringify(newOperation.indices) !== JSON.stringify(currentOperation.indices);
+              
+              // If same operation type but different indices, add alternating flag
+              if (isSameOperationType) {
+                console.log(`${algo}: Same operation type (${newOperation.type}), alternating highlight`);
+                
+                // Toggle the alternating flag or set it if it doesn't exist
+                const alternateFlag = currentOperation.alternate ? !currentOperation.alternate : true;
+                
+                processedUpdates[algo] = {
+                  ...update,
+                  lastOperation: {
+                    ...newOperation,
+                    alternate: alternateFlag
+                  }
+                };
+              } else {
+                // Different operation type, reset the alternating flag
+                console.log(`${algo}: New operation type (${newOperation.type})`);
+                processedUpdates[algo] = {
+                  ...update,
+                  lastOperation: {
+                    ...newOperation,
+                    alternate: false
+                  }
+                };
+              }
+            } else {
+              // No operation, just pass through the update
+              processedUpdates[algo] = update;
+            }
+          });
+          
+          // Now add the processed updates
+          return {
+            ...prevData,
+            progress: {
+              ...newProgress,
+              ...processedUpdates
+            },
+            currentStep: Math.max(
+              ...Object.values(updates).map(u => u.currentStep),
+              prevData.currentStep || 0
+            )
+          };
+        } catch (error) {
+          console.error("Error processing race update:", error);
+          return prevData; // Return unchanged state on error
+        }
       });
     });
 
     // Algorithm finished event
     socket.on('algorithm_finished', ({ type, position, steps, comparisons, swaps }) => {
+      // Skip updates during transition periods
+      if (socket._ignoreRaceEvents) {
+        console.log('Ignoring algorithm finished during transition');
+        return;
+      }
+      
       setRaceData((prevData) => {
-        if (!prevData || !prevData.progress || !prevData.progress[type]) return prevData;
+        // If there's no previous data, we can't update the state
+        if (!prevData) return null;
         
-        const newProgress = { ...prevData.progress };
-        newProgress[type] = {
-          ...newProgress[type],
-          position,
-          steps,
-          comparisons,
-          swaps,
-          finished: true
-        };
-        
-        return { ...prevData, progress: newProgress };
+        try {
+          // Check if the progress or algorithm data exists
+          if (!prevData.progress || !prevData.progress[type]) {
+            // If we don't have existing progress data for this algorithm,
+            // create minimal data for it based on what was provided
+            const newProgress = { ...(prevData.progress || {}) };
+            newProgress[type] = {
+              dataset: [...prevData.dataset],
+              currentStep: steps,
+              comparisons,
+              swaps,
+              position,
+              finished: true
+            };
+            
+            return { ...prevData, progress: newProgress };
+          }
+          
+          // Normal case - update existing algorithm data
+          const newProgress = { ...prevData.progress };
+          newProgress[type] = {
+            ...newProgress[type],
+            position,
+            steps,
+            comparisons,
+            swaps,
+            finished: true
+          };
+          
+          return { ...prevData, progress: newProgress };
+        } catch (error) {
+          console.error("Error processing algorithm finished:", error);
+          return prevData; // Return unchanged state on error
+        }
       });
     });
 
     // Algorithm stopped event (when a race is ended early)
     socket.on('algorithm_stopped', ({ type, position, steps, comparisons, swaps }) => {
+      // Skip updates during transition periods
+      if (socket._ignoreRaceEvents) {
+        console.log('Ignoring algorithm stopped during transition');
+        return;
+      }
+      
       setRaceData((prevData) => {
-        if (!prevData || !prevData.progress || !prevData.progress[type]) return prevData;
+        // If there's no previous data, we can't update the state
+        if (!prevData) return null;
         
-        const newProgress = { ...prevData.progress };
-        newProgress[type] = {
-          ...newProgress[type],
-          position,
-          steps,
-          comparisons,
-          swaps,
-          finished: true,
-          stoppedEarly: true // Mark as stopped early
-        };
-        
-        return { ...prevData, progress: newProgress };
+        try {
+          // Check if the progress or algorithm data exists
+          if (!prevData.progress || !prevData.progress[type]) {
+            // If we don't have existing progress data for this algorithm,
+            // create minimal data for it based on what was provided
+            const newProgress = { ...(prevData.progress || {}) };
+            newProgress[type] = {
+              dataset: [...prevData.dataset],
+              currentStep: steps,
+              comparisons,
+              swaps,
+              position,
+              finished: true,
+              stoppedEarly: true
+            };
+            
+            return { ...prevData, progress: newProgress };
+          }
+          
+          // Normal case - update existing algorithm data
+          const newProgress = { ...prevData.progress };
+          newProgress[type] = {
+            ...newProgress[type],
+            position,
+            steps,
+            comparisons,
+            swaps,
+            finished: true,
+            stoppedEarly: true // Mark as stopped early
+          };
+          
+          return { ...prevData, progress: newProgress };
+        } catch (error) {
+          console.error("Error processing algorithm stopped:", error);
+          return prevData; // Return unchanged state on error
+        }
       });
     });
 
     // Race ended early event
     socket.on('race_ended_early', ({ stoppedBy, stoppedAlgorithms }) => {
+      // Skip updates during transition periods
+      if (socket._ignoreRaceEvents) {
+        console.log('Ignoring race ended early during transition');
+        return;
+      }
+      
       console.log(`Race ended early by ${stoppedBy}, stopping algorithms:`, stoppedAlgorithms);
       
       // We need to ensure the raceData state is properly prepared for the next race
       // to prevent visualization jitter problems
       setRaceData(prevData => {
-        if (!prevData) return prevData;
+        // If there's no previous data, just return null and let the race_results event handle it
+        if (!prevData) return null;
         
         // Create a clean dataset reference that won't cause visualization jitter
         const cleanDataset = [...prevData.dataset];
@@ -256,20 +345,49 @@ export const RoomProvider = ({ children }) => {
         return {
           ...prevData,
           dataset: cleanDataset,
-          // Keep the progress data for showing results
           currentStep: prevData.currentStep,
-          endedEarly: true // Mark that this race was ended early
+          endedEarly: true, // Mark that this race was ended early
+          stoppedAlgorithms
         };
       });
     });
 
     // Race results event
-    socket.on('race_results', ({ results: raceResults, winnerAlgorithm }) => {
+    socket.on('race_results', ({ results: raceResults, winnerAlgorithm, endedEarly }) => {
+      // Skip updates during transition periods
+      if (socket._ignoreRaceEvents) {
+        console.log('Ignoring race results during transition');
+        return;
+      }
+      
       setRoomStatus('finished');
       setResults({
         winnerAlgorithm,
-        results: raceResults
+        results: raceResults,
+        endedEarly: endedEarly || false
       });
+      
+      // If the race was ended early, we need to completely clear the race data
+      // to prevent visualization jitter in the next race
+      if (endedEarly) {
+        console.log('Race ended early, fully clearing race data');
+        
+        // Use a setTimeout to ensure this happens after rendering is complete
+        setTimeout(() => {
+          setRaceData(prevData => {
+            if (!prevData) return null;
+            
+            // Create a very minimal dataset that won't cause jitter
+            return {
+              dataset: [...prevData.dataset], // Keep only the dataset
+              progress: {}, // Empty all progress
+              currentStep: 0,
+              endedEarly: true,
+              cleaned: true
+            };
+          });
+        }, 100);
+      }
     });
 
     // Race error event
@@ -336,6 +454,22 @@ export const RoomProvider = ({ children }) => {
       setRaceData(null);
     });
 
+    // Handle race state reset
+    socket.on('reset_room_state', ({ roomCode }) => {
+      console.log(`Room ${roomCode} state reset: completely clearing race data`);
+      
+      // First, update status
+      setRoomStatus('waiting');
+      setResults(null);
+      
+      // Fully clear the race data to ensure a clean slate
+      setRaceData(null);
+      
+      // Reset any user bets
+      setUserBet(null);
+      setAllBets([]);
+    });
+
     // Clean up listeners on unmount
     return () => {
       // Clean up all socket event listeners
@@ -361,9 +495,38 @@ export const RoomProvider = ({ children }) => {
         socket.off('host_changed');
         socket.off('bets_reset');
         socket.off('room_state_reset');
+        socket.off('reset_room_state');
       }
     };
   }, [socket, connected]);
+
+  // Special effect to handle race data changes and cleanup for race transitions
+  useEffect(() => {
+    // When race data is cleared (becomes null), we may need to handle pending events
+    if (!raceData && roomStatus === 'waiting') {
+      console.log('Race data cleared, handling race state transition');
+      
+      // Set a flag on the socket to ignore race updates temporarily
+      if (socket) {
+        // Set a flag on socket to ignore race events for a short period
+        socket._ignoreRaceEvents = true;
+        
+        // Remove the flag after a short delay
+        const cleanupTimer = setTimeout(() => {
+          if (socket) {
+            socket._ignoreRaceEvents = false;
+          }
+        }, 500); // Ignore for 500ms to ensure clean transition
+        
+        return () => {
+          clearTimeout(cleanupTimer);
+          if (socket) {
+            socket._ignoreRaceEvents = false;
+          }
+        };
+      }
+    }
+  }, [raceData, roomStatus, socket]);
 
   // Clear error
   const clearError = () => {

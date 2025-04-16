@@ -81,6 +81,9 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
       broadcastRaceUpdate(io, roomCode, race);
     }, Math.min(100, race.stepSpeed)); // Update regularly, but not more than 10 times per second
     
+    // Store the interval reference in the race object so it can be cleared when ending early
+    race.updateInterval = updateInterval;
+    
     // Start each algorithm and handle completion
     const algorithmPromises = Object.entries(race.algorithms).map(async ([type, algorithm]) => {
       try {
@@ -101,7 +104,9 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
         
         // Check if all algorithms are done
         if (race.finishedAlgorithms.length === Object.keys(race.algorithms).length) {
-          clearInterval(updateInterval);
+          if (race.updateInterval) {
+            clearInterval(race.updateInterval);
+          }
           await finalizeRace(io, roomCode);
         }
       } catch (error) {
@@ -167,11 +172,17 @@ const finalizeRace = async (io, roomCode) => {
       }
     }
     
+    // Keep track of the algorithms that were forcibly stopped
+    const stoppedAlgorithms = race.stoppedAlgorithms || [];
+    
     // Get final results with performance metrics
     const results = {};
     for (const [type, algorithm] of Object.entries(race.algorithms)) {
       const isFinished = race.finishedAlgorithms.includes(type);
-      const wasStoppedEarly = isFinished && race.finishedAlgorithms.indexOf(type) > 0 && race.endedEarly;
+      
+      // Only mark as stopped early if this algorithm was explicitly stopped
+      // Not just because it wasn't the winner in an early ended race
+      const wasStoppedEarly = stoppedAlgorithms.includes(type);
       
       results[type] = {
         position: race.finishedAlgorithms.indexOf(type) + 1,
@@ -179,7 +190,7 @@ const finalizeRace = async (io, roomCode) => {
         comparisons: algorithm.comparisons,
         swaps: algorithm.swaps,
         isWinner: type === winnerAlgorithm,
-        stoppedEarly: wasStoppedEarly || false
+        stoppedEarly: wasStoppedEarly
       };
     }
     
@@ -327,14 +338,20 @@ exports.endRaceEarly = async (io, socket, roomCode) => {
     // Mark the race as ended early so finalizeRace can handle it properly
     race.endedEarly = true;
     
+    // Initialize array to track stopped algorithms
+    race.stoppedAlgorithms = [];
+    
     // Stop all still-running algorithms
     for (const [type, algorithm] of Object.entries(race.algorithms)) {
       // If this algorithm hasn't finished yet
       if (!race.finishedAlgorithms.includes(type) && algorithm.isRunning) {
         algorithm.pause();
         
-        // Add it to finished algorithms with a special marker
+        // Add it to finished algorithms
         race.finishedAlgorithms.push(type);
+        
+        // Add to the list of algorithms that were explicitly stopped
+        race.stoppedAlgorithms.push(type);
         
         // Notify clients about algorithm being forcibly stopped
         io.to(roomCode).emit('algorithm_stopped', {
@@ -347,6 +364,11 @@ exports.endRaceEarly = async (io, socket, roomCode) => {
       }
     }
     
+    // Clear the update interval if it exists
+    if (race.updateInterval) {
+      clearInterval(race.updateInterval);
+    }
+    
     // Finalize the race
     await finalizeRace(io, roomCode);
     
@@ -354,7 +376,7 @@ exports.endRaceEarly = async (io, socket, roomCode) => {
     io.to(roomCode).emit('race_ended_early', {
       roomCode,
       stoppedBy: socket.username || socket.id,
-      stoppedAlgorithms: race.finishedAlgorithms.slice(1) // All except the winner
+      stoppedAlgorithms: race.stoppedAlgorithms // Use the dedicated stopped algorithms list
     });
     
     return true;
