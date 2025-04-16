@@ -312,7 +312,7 @@ class InPlaceStableSort extends SortingAlgorithm {
       this.currentStep++;
       this.lastOperation = {
         type: 'swap',
-        indices: [p1, -1],
+        indices: [p1, from + i],
         values: [this.dataset[p1], val]
       };
       await sleep(this.stepSpeed);
@@ -573,8 +573,8 @@ class MergeSort extends SortingAlgorithm {
       // Visualize copying to auxiliary array
       this.currentStep++;
       this.lastOperation = {
-        type: 'copy',
-        indices: [i, i],
+        type: 'copy_to_aux',
+        indices: [i], // Only highlight the current index
         values: [this.dataset[i], this.auxArray[i]]
       };
       await sleep(this.stepSpeed);
@@ -604,7 +604,7 @@ class MergeSort extends SortingAlgorithm {
       this.currentStep++;
       this.lastOperation = {
         type: 'swap',
-        indices: [k, -1],
+        indices: [k, i-1 < left ? j-1 : i-1], // Include both the destination index and the source index
         values: [this.dataset[k], this.auxArray[i-1 < left ? j-1 : i-1]]
       };
       await sleep(this.stepSpeed);
@@ -621,7 +621,7 @@ class MergeSort extends SortingAlgorithm {
       this.currentStep++;
       this.lastOperation = {
         type: 'swap',
-        indices: [k, i],
+        indices: [k, i], // Include both destination and source indices
         values: [this.dataset[k], this.auxArray[i]]
       };
       await sleep(this.stepSpeed);
@@ -639,7 +639,7 @@ class MergeSort extends SortingAlgorithm {
       this.currentStep++;
       this.lastOperation = {
         type: 'swap',
-        indices: [k, j],
+        indices: [k, j], // Include both destination and source indices
         values: [this.dataset[k], this.auxArray[j]]
       };
       await sleep(this.stepSpeed);

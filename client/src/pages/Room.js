@@ -72,7 +72,8 @@ const Room = () => {
     insertion: false,
     selection: false,
     heap: false,
-    bogo: false
+    bogo: false,
+    stalin: false
   });
   
   // Add a new state for live speed control
@@ -101,7 +102,8 @@ const Room = () => {
         insertion: false,
         selection: false,
         heap: false,
-        bogo: false
+        bogo: false,
+        stalin: false
       };
       
       algorithms.forEach(algo => {
@@ -336,10 +338,16 @@ const Room = () => {
               const { type, alternate } = algorithmData.lastOperation;
               if (type === 'comparison') {
                 backgroundColor = alternate ? 'var(--color-compare-alt)' : 'var(--color-compare)';
-              } else if (type === 'swap') {
+              } else if (type === 'swap' || type === 'shift' || type === 'insert' || 
+                        type === 'merge_place' || type === 'merge_copy' || 
+                        type === 'rotate_shift' || type === 'rotate_place') {
                 backgroundColor = alternate ? 'var(--color-swap-alt)' : 'var(--color-swap)';
               } else if (type === 'shuffle') {
                 backgroundColor = 'var(--color-swap)'; // Use swap color for shuffle
+              } else if (type === 'removal') {
+                backgroundColor = 'var(--color-removal)'; // For Stalin sort
+              } else if (type === 'copy_to_aux') {
+                backgroundColor = 'var(--color-compare)'; // Use comparison color for copying to auxiliary array
               }
             }
             
@@ -579,6 +587,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('bogo')}
             />
             <label htmlFor="algo-bogo">{getAlgorithmDisplayName('bogo')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-stalin"
+              checked={algorithmSelection.stalin}
+              onChange={() => handleAlgorithmChange('stalin')}
+            />
+            <label htmlFor="algo-stalin">{getAlgorithmDisplayName('stalin')}</label>
           </div>
         </div>
         <div className="settings-notice">

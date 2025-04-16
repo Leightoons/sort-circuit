@@ -23,6 +23,12 @@
   --color-dark: #343a40;
   --color-gray: #6c757d;
   --color-gray-light: #e9ecef;
+  --color-removal: #ff5722; /* Orange-red for Stalin sort removal */
+  --color-shift: #8bc34a; /* Light green for insertion sort shifts */
+  --color-insert: #4caf50; /* Green for insertion sort inserts */
+  --color-merge: #3f51b5; /* Indigo for merge sort operations */
+  --color-rotate: #9c27b0; /* Purple for in-place stable sort rotations */
+  --color-copy: #00bcd4; /* Cyan for auxiliary array operations */
 }
 
 * {
