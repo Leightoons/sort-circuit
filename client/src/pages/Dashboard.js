@@ -18,7 +18,8 @@ const ALGORITHM_NAMES = {
   'stalin': 'Stalin Sort',
   'timsort': 'TimSort',
   'powersort': 'PowerSort',
-  'gnome': 'Gnome Sort'
+  'gnome': 'Gnome Sort',
+  'radix': 'Radix Sort'
 };
 
 // Helper function to get the display name for an algorithm
@@ -355,6 +356,16 @@ const Dashboard = () => {
                   onChange={() => handleAlgorithmChange('gnome')}
                 />
                 <label htmlFor="gnome">{getAlgorithmDisplayName('gnome')}</label>
+              </div>
+              <div className="algorithm-option">
+                <input
+                  type="checkbox"
+                  id="radix"
+                  name="radix"
+                  checked={selectedAlgorithms.includes('radix')}
+                  onChange={() => handleAlgorithmChange('radix')}
+                />
+                <label htmlFor="radix">{getAlgorithmDisplayName('radix')}</label>
               </div>
             </div>
           </div>

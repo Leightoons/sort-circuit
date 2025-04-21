@@ -1388,6 +1388,104 @@ class GnomeSort extends SortingAlgorithm {
   }
 }
 
+/**
+ * Radix Sort
+ * 
+ * A non-comparative integer sorting algorithm that sorts data by processing
+ * individual digits. It uses counting sort as a subroutine to sort.
+ * Works by distributing elements into buckets according to their radix (digit value),
+ * and then recollecting them in order.
+ */
+class RadixSort extends SortingAlgorithm {
+  async sort() {
+    const n = this.dataset.length;
+    if (n <= 1) return;
+    
+    // Find the maximum number to know the number of digits
+    let max = this.dataset[0];
+    this.arrayAccesses++; // Count reading max
+    
+    for (let i = 1; i < n; i++) {
+      this.arrayAccesses++; // Count reading for max comparison
+      if (this.dataset[i] > max) {
+        max = this.dataset[i];
+      }
+    }
+    
+    // Do counting sort for every digit
+    // exp is 10^i where i is the current digit number
+    for (let exp = 1; Math.floor(max / exp) > 0; exp *= 10) {
+      await this.countingSort(exp);
+    }
+  }
+  
+  // A function to do counting sort according to the digit represented by exp
+  async countingSort(exp) {
+    const n = this.dataset.length;
+    
+    // Create output array and count array
+    const output = new Array(n);
+    const count = new Array(10).fill(0);
+    
+    // Store count of occurrences in count[]
+    for (let i = 0; i < n; i++) {
+      this.arrayAccesses++; // Count reading from dataset
+      const digit = Math.floor(this.dataset[i] / exp) % 10;
+      count[digit]++;
+      
+      // Visualize the bucketing operation
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'bucketing',
+        indices: [i],
+        values: [this.dataset[i]]
+      };
+      await sleep(this.stepSpeed);
+    }
+    
+    // Change count[i] so that count[i] now contains actual
+    // position of this digit in output[]
+    for (let i = 1; i < 10; i++) {
+      count[i] += count[i - 1];
+    }
+    
+    // Build the output array
+    for (let i = n - 1; i >= 0; i--) {
+      this.arrayAccesses++; // Count reading from dataset
+      const digit = Math.floor(this.dataset[i] / exp) % 10;
+      
+      this.arrayWrites++; // Count writing to output
+      output[count[digit] - 1] = this.dataset[i];
+      count[digit]--;
+      
+      // Visualize placing elements in output array
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'place',
+        indices: [i, count[digit]],
+        values: [this.dataset[i], output[count[digit]]]
+      };
+      await sleep(this.stepSpeed);
+    }
+    
+    // Copy the output array to dataset[]
+    for (let i = 0; i < n; i++) {
+      this.arrayWrites++; // Count writing back to dataset
+      this.dataset[i] = output[i];
+      
+      // Visualize copying back
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [i],
+        values: [output[i]]
+      };
+      await sleep(this.stepSpeed);
+    }
+  }
+}
+
 // Factory function to create appropriate algorithm instance
 const createAlgorithm = (type, dataset, stepSpeed) => {
   switch (type.toLowerCase()) {
@@ -1423,6 +1521,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'gnome':
       // Gnome sort - simple back and forth sorting algorithm
       return new GnomeSort(dataset, stepSpeed);
+    case 'radix':
+      // Radix sort - non-comparative integer sorting algorithm
+      return new RadixSort(dataset, stepSpeed);
     default:
       throw new Error(`Unknown algorithm type: ${type}`);
   }

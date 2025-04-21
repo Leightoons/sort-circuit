@@ -76,7 +76,8 @@ const Room = () => {
     stalin: false,
     timsort: false,
     powersort: false,
-    gnome: false
+    gnome: false,
+    radix: false
   });
   
   // Add a new state for live speed control
@@ -109,7 +110,8 @@ const Room = () => {
         stalin: false,
         timsort: false,
         powersort: false,
-        gnome: false
+        gnome: false,
+        radix: false
       };
       
       algorithms.forEach(algo => {
@@ -368,6 +370,8 @@ const Room = () => {
                 backgroundColor = 'var(--color-removal)'; // For Stalin sort
               } else if (type === 'copy_to_aux') {
                 backgroundColor = 'var(--color-compare)'; // Use comparison color for copying to auxiliary array
+              } else if (type === 'bucketing' || type === 'place') {
+                backgroundColor = 'var(--color-swap)'; // Use swap color for radix sort operations
               }
             }
             
@@ -643,6 +647,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('gnome')}
             />
             <label htmlFor="algo-gnome">{getAlgorithmDisplayName('gnome')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-radix"
+              checked={algorithmSelection.radix}
+              onChange={() => handleAlgorithmChange('radix')}
+            />
+            <label htmlFor="algo-radix">{getAlgorithmDisplayName('radix')}</label>
           </div>
         </div>
         <div className="settings-notice">
