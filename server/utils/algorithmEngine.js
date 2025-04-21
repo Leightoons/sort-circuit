@@ -13,6 +13,8 @@ class SortingAlgorithm {
     this.stepSpeed = stepSpeed;
     this.comparisons = 0;
     this.swaps = 0;
+    this.arrayAccesses = 0; // Track array read operations
+    this.arrayWrites = 0;   // Track array write operations
     this.finished = false;
     this.lastOperation = null;
     this.isRunning = false;
@@ -59,6 +61,8 @@ class SortingAlgorithm {
       dataset: [...this.dataset],
       comparisons: this.comparisons,
       swaps: this.swaps,
+      arrayAccesses: this.arrayAccesses,
+      arrayWrites: this.arrayWrites,
       currentStep: this.currentStep,
       finished: this.finished,
       lastOperation: this.lastOperation,
@@ -66,9 +70,23 @@ class SortingAlgorithm {
     };
   }
 
+  // Helper method to safely access array elements with tracking
+  access(index) {
+    this.arrayAccesses++;
+    return this.dataset[index];
+  }
+  
+  // Helper method to safely write to array elements with tracking
+  write(index, value) {
+    this.arrayWrites++;
+    this.dataset[index] = value;
+    return value;
+  }
+
   // Async helper method to perform a comparison
   async compare(i, j) {
     this.comparisons++;
+    this.arrayAccesses += 2; // Reading two array elements counts as two accesses
     this.currentStep++;
     this.lastOperation = {
       type: 'comparison',
@@ -85,6 +103,8 @@ class SortingAlgorithm {
   // Async helper method to perform a swap
   async swap(i, j) {
     this.swaps++;
+    this.arrayAccesses += 2; // Reading values counts as accesses
+    this.arrayWrites += 2;   // Writing values counts as writes
     this.currentStep++;
     this.lastOperation = {
       type: 'swap',
@@ -240,6 +260,10 @@ class InPlaceStableSort extends SortingAlgorithm {
       for (let i = from + 1; i < to; i++) {
         for (let j = i; j > from; j--) {
           if (await this.compare(j - 1, j)) {
+            // The compare method already counts accesses
+            // But we need to count the actual swap operations
+            this.arrayAccesses += 2; // Count two reads for the swap
+            this.arrayWrites += 2;   // Count two writes for the swap
             await this.swap(j, j - 1);
           } else {
             break;
@@ -275,6 +299,7 @@ class InPlaceStableSort extends SortingAlgorithm {
     
     for (let i = 0; i < n; i++) {
       // Save the first element
+      this.arrayAccesses++; // Count read for val
       const val = this.dataset[from + i];
       const shift = mid - from;
       
@@ -283,6 +308,8 @@ class InPlaceStableSort extends SortingAlgorithm {
       
       while (p2 !== from + i) {
         // Move p2 to p1
+        this.arrayAccesses++; // Count read from p2
+        this.arrayWrites++; // Count write to p1
         this.dataset[p1] = this.dataset[p2];
         
         // Visualize this operation
@@ -305,6 +332,7 @@ class InPlaceStableSort extends SortingAlgorithm {
       }
       
       // Place the saved value
+      this.arrayWrites++; // Count write to p1
       this.dataset[p1] = val;
       
       // Visualize this operation
@@ -388,6 +416,7 @@ class InsertionSort extends SortingAlgorithm {
     const n = this.dataset.length;
     
     for (let i = 1; i < n; i++) {
+      this.arrayAccesses++; // Count access for reading key
       const key = this.dataset[i];
       let j = i - 1;
       
@@ -400,7 +429,10 @@ class InsertionSort extends SortingAlgorithm {
         // Compare with current element
         await this.compare(j, i);
         
+        this.arrayAccesses++; // Count access for reading dataset[j]
         if (this.dataset[j] > key) {
+          this.arrayAccesses++; // Count access for reading dataset[j]
+          this.arrayWrites++; // Count write for dataset[j+1]
           // Shift element to the right
           this.dataset[j + 1] = this.dataset[j];
           
@@ -422,6 +454,8 @@ class InsertionSort extends SortingAlgorithm {
       
       // Insert the key at the correct position
       if (this.dataset[j + 1] !== key) {
+        this.arrayAccesses++; // Count access for reading dataset[j+1]
+        this.arrayWrites++; // Count write for dataset[j+1]
         const oldValue = this.dataset[j + 1];
         this.dataset[j + 1] = key;
         
@@ -568,6 +602,8 @@ class MergeSort extends SortingAlgorithm {
   async merge(left, mid, right) {
     // Copy data to auxiliary array
     for (let i = left; i <= right; i++) {
+      this.arrayAccesses++; // Count read from dataset
+      this.arrayWrites++; // Count write to auxiliary array
       this.auxArray[i] = this.dataset[i];
       
       // Visualize copying to auxiliary array
@@ -589,14 +625,17 @@ class MergeSort extends SortingAlgorithm {
       // Compare elements from both subarrays
       await this.compare(i, j);
       
+      this.arrayAccesses++; // Count read from auxiliary array
       if (this.auxArray[i] <= this.auxArray[j]) {
         // Element from first subarray is smaller
-        //await this.swap(i, k);
+        this.arrayAccesses++; // Count read from auxiliary array for i
+        this.arrayWrites++; // Count write to dataset
         this.dataset[k] = this.auxArray[i];
         i++;
       } else {
         // Element from second subarray is smaller
-        //await this.swap(i, k);
+        this.arrayAccesses++; // Count read from auxiliary array for j
+        this.arrayWrites++; // Count write to dataset
         this.dataset[k] = this.auxArray[j];
         j++;
       }
@@ -617,6 +656,8 @@ class MergeSort extends SortingAlgorithm {
     
     // Copy remaining elements from first subarray
     while (i <= mid) {
+      this.arrayAccesses++; // Count read from auxiliary array
+      this.arrayWrites++; // Count write to dataset
       this.dataset[k] = this.auxArray[i];
       
       // Visualize the copy back
@@ -635,6 +676,8 @@ class MergeSort extends SortingAlgorithm {
     
     // Copy remaining elements from second subarray
     while (j <= right) {
+      this.arrayAccesses++; // Count read from auxiliary array
+      this.arrayWrites++; // Count write to dataset
       this.dataset[k] = this.auxArray[j];
       
       // Visualize the copy back
@@ -733,10 +776,13 @@ class TimSort extends SortingAlgorithm {
       const needsInsert = await this.compare(j, i);
       
       if (needsInsert) {
+        this.arrayAccesses++; // Count access for reading key
         const key = this.dataset[i];
         
         // If we need to insert, use direct approach
         while (j >= left && this.dataset[j] > key) {
+          this.arrayAccesses++; // Count access for reading dataset[j]
+          this.arrayWrites++; // Count write for dataset[j+1]
           this.dataset[j + 1] = this.dataset[j];
           
           // Visualize the shift
@@ -753,6 +799,7 @@ class TimSort extends SortingAlgorithm {
         }
         
         // Place the key in its correct position
+        this.arrayWrites++; // Count write for dataset[j+1]
         this.dataset[j + 1] = key;
         
         // Visualize the final insertion
@@ -772,10 +819,12 @@ class TimSort extends SortingAlgorithm {
   async mergeRuns(left, mid, right) {
     // Copy to auxiliary array
     for (let i = left; i <= right; i++) {
+      this.arrayAccesses++; // Count read from dataset
+      this.arrayWrites++; // Count write to auxiliary array
       this.auxArray[i] = this.dataset[i];
     }
     
-    // Just visualize the copy once
+    // Visualize the copy operation
     this.currentStep++;
     this.lastOperation = {
       type: 'copy_to_aux',
@@ -790,13 +839,15 @@ class TimSort extends SortingAlgorithm {
     
     // Standard merge process
     while (i <= mid && j <= right) {
-      // Compare the elements
       await this.compare(i, j);
       
+      this.arrayAccesses += 2; // Count reads from auxiliary array
       if (this.auxArray[i] <= this.auxArray[j]) {
+        this.arrayWrites++; // Count write to dataset
         this.dataset[k] = this.auxArray[i];
         i++;
       } else {
+        this.arrayWrites++; // Count write to dataset
         this.dataset[k] = this.auxArray[j];
         j++;
       }
@@ -814,8 +865,10 @@ class TimSort extends SortingAlgorithm {
       k++;
     }
     
-    // Copy any remaining elements from left subarray
+    // Copy remaining elements from left subarray
     while (i <= mid) {
+      this.arrayAccesses++; // Count read from auxiliary array
+      this.arrayWrites++; // Count write to dataset
       this.dataset[k] = this.auxArray[i];
       
       // Visualize the copy
@@ -832,8 +885,10 @@ class TimSort extends SortingAlgorithm {
       k++;
     }
     
-    // Copy any remaining elements from right subarray
+    // Copy remaining elements from right subarray
     while (j <= right) {
+      this.arrayAccesses++; // Count read from auxiliary array
+      this.arrayWrites++; // Count write to dataset
       this.dataset[k] = this.auxArray[j];
       
       // Visualize the copy
@@ -1065,9 +1120,12 @@ class PowerSort extends SortingAlgorithm {
       const needsInsert = await this.compare(j, i);
       
       if (needsInsert) {
+        this.arrayAccesses++; // Count access for reading key
         const key = this.dataset[i];
         
         while (j >= left && this.dataset[j] > key) {
+          this.arrayAccesses++; // Count access for reading dataset[j]
+          this.arrayWrites++; // Count write for dataset[j+1]
           this.dataset[j + 1] = this.dataset[j];
           
           // Visualize the shift
@@ -1084,6 +1142,7 @@ class PowerSort extends SortingAlgorithm {
         }
         
         // Place the key in its correct position
+        this.arrayWrites++; // Count write for dataset[j+1]
         this.dataset[j + 1] = key;
         
         // Visualize the insertion
@@ -1103,6 +1162,8 @@ class PowerSort extends SortingAlgorithm {
   async mergeRuns(left, mid, right) {
     // Copy to auxiliary array
     for (let i = left; i <= right; i++) {
+      this.arrayAccesses++; // Count read from dataset
+      this.arrayWrites++; // Count write to auxiliary array
       this.auxArray[i] = this.dataset[i];
     }
     
@@ -1123,10 +1184,13 @@ class PowerSort extends SortingAlgorithm {
     while (i <= mid && j <= right) {
       await this.compare(i, j);
       
+      this.arrayAccesses += 2; // Count reads from auxiliary array
       if (this.auxArray[i] <= this.auxArray[j]) {
+        this.arrayWrites++; // Count write to dataset
         this.dataset[k] = this.auxArray[i];
         i++;
       } else {
+        this.arrayWrites++; // Count write to dataset
         this.dataset[k] = this.auxArray[j];
         j++;
       }
@@ -1146,6 +1210,8 @@ class PowerSort extends SortingAlgorithm {
     
     // Copy remaining elements from left subarray
     while (i <= mid) {
+      this.arrayAccesses++; // Count read from auxiliary array
+      this.arrayWrites++; // Count write to dataset
       this.dataset[k] = this.auxArray[i];
       
       // Visualize the copy
@@ -1164,6 +1230,8 @@ class PowerSort extends SortingAlgorithm {
     
     // Copy remaining elements from right subarray
     while (j <= right) {
+      this.arrayAccesses++; // Count read from auxiliary array
+      this.arrayWrites++; // Count write to dataset
       this.dataset[k] = this.auxArray[j];
       
       // Visualize the copy

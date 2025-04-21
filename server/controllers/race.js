@@ -158,6 +158,8 @@ const calculateAlgorithmResult = (algorithm, type, race, stoppedAlgorithms, winn
     steps: algorithm.currentStep,
     comparisons: algorithm.comparisons,
     swaps: algorithm.swaps,
+    arrayAccesses: algorithm.arrayAccesses,
+    arrayWrites: algorithm.arrayWrites,
     isWinner: type === winnerAlgorithm,
     stoppedEarly: wasStoppedEarly
   };

@@ -280,11 +280,17 @@ const Room = () => {
       );
     }
     
-    const algorithmData = raceData.progress[algorithmType];
-    const { dataset, finished, position, comparisons, swaps, stoppedEarly } = algorithmData;
-    
-    // Ensure we have a valid dataset - if not, use the race dataset
-    const visualizationDataset = dataset || (raceData && raceData.dataset ? [...raceData.dataset] : []);
+    const { 
+      dataset: visualizationDataset, 
+      comparisons = 0, 
+      swaps = 0, 
+      arrayAccesses = 0, 
+      arrayWrites = 0,
+      finished = false, 
+      lastOperation, 
+      position, 
+      stoppedEarly = false 
+    } = raceData.progress[algorithmType];
     
     // Generate a unique key for this visualization based on the algorithm and 
     // either the cleaned/cleanStart flag or a timestamp to force fresh rendering
@@ -293,7 +299,7 @@ const Room = () => {
     return (
       <div 
         key={visualKey}
-        className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${algorithmData.lastOperation ? 'last-updated' : ''} ${stoppedEarly ? 'stopped-early' : ''}`}
+        className={`algorithm-visualization ${finished ? 'finished' : 'racing'} ${lastOperation ? 'last-updated' : ''} ${stoppedEarly ? 'stopped-early' : ''}`}
         data-algorithm={algorithmType}
       >
         <h3>{getAlgorithmDisplayName(algorithmType)}</h3>
@@ -301,7 +307,7 @@ const Room = () => {
         <div className="visualization-stats">
           <div className="stat">
             <span>Steps:</span>
-            <span>{algorithmData.currentStep}</span>
+            <span>{raceData.currentStep}</span>
           </div>
           <div className="stat">
             <span>Comparisons:</span>
@@ -310,6 +316,14 @@ const Room = () => {
           <div className="stat">
             <span>Swaps:</span>
             <span>{swaps}</span>
+          </div>
+          <div className="stat">
+            <span>Accesses:</span>
+            <span>{arrayAccesses || 0}</span>
+          </div>
+          <div className="stat">
+            <span>Writes:</span>
+            <span>{arrayWrites || 0}</span>
           </div>
           {finished && (
             <div className="position">
@@ -328,9 +342,9 @@ const Room = () => {
           {visualizationDataset && visualizationDataset.map((value, index) => {
             // Determine if this block should be highlighted
             // Only highlight if the algorithm is still running
-            const isHighlighted = !finished && algorithmData.lastOperation && 
-              (algorithmData.lastOperation.indices.includes(index) || 
-               algorithmData.lastOperation.type === 'shuffle'); // Highlight all blocks during shuffle
+            const isHighlighted = !finished && lastOperation && 
+              (lastOperation.indices.includes(index) || 
+               lastOperation.type === 'shuffle'); // Highlight all blocks during shuffle
             
             // Choose color based on operation type and alternating flag
             let backgroundColor = undefined;
@@ -339,7 +353,7 @@ const Room = () => {
             if (finished) {
               backgroundColor = 'var(--color-success-bars)';
             } else if (isHighlighted) {
-              const { type, alternate } = algorithmData.lastOperation;
+              const { type, alternate } = lastOperation;
               if (type === 'comparison') {
                 backgroundColor = alternate ? 'var(--color-compare-alt)' : 'var(--color-compare)';
               } else if (type === 'swap' || type === 'shift' || type === 'insert' || 

@@ -2,6 +2,8 @@ import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
+import { AiOutlineSwap } from 'react-icons/ai';
+import { FiRefreshCw, FiEye, FiEdit, FiClock } from 'react-icons/fi';
 
 // Define proper display names for each algorithm
 const ALGORITHM_NAMES = {
@@ -21,6 +23,57 @@ const ALGORITHM_NAMES = {
 // Helper function to get the display name for an algorithm
 const getAlgorithmDisplayName = (algorithmId) => {
   return ALGORITHM_NAMES[algorithmId] || algorithmId.charAt(0).toUpperCase() + algorithmId.slice(1) + ' Sort';
+};
+
+const RaceHistoryItem = ({ race }) => {
+  // Add array accesses and writes to the displayable stats
+  const resultsMetrics = [
+    { label: 'Comparisons', icon: <AiOutlineSwap /> },
+    { label: 'Swaps', icon: <FiRefreshCw /> },
+    { label: 'Accesses', icon: <FiEye /> },
+    { label: 'Writes', icon: <FiEdit /> }
+  ];
+
+  const renderAlgorithmData = (algorithm) => {
+    const { comparisons, swaps, arrayAccesses, arrayWrites, position } = algorithm;
+    
+    return (
+      <div className="algorithm-item">
+        <div className="algorithm-name">
+          <span className={`position position-${position}`}>#{position}</span>
+          <span>{getAlgorithmDisplayName(algorithm.type)}</span>
+        </div>
+        <div className="algorithm-metrics">
+          <div className="metric">
+            <FiClock />
+            <span>{algorithm.timeElapsed}ms</span>
+          </div>
+          <div className="metric">
+            <AiOutlineSwap />
+            <span>{comparisons}</span>
+          </div>
+          <div className="metric">
+            <FiRefreshCw />
+            <span>{swaps}</span>
+          </div>
+          <div className="metric">
+            <FiEye />
+            <span>{arrayAccesses || 0}</span>
+          </div>
+          <div className="metric">
+            <FiEdit />
+            <span>{arrayWrites || 0}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="race-history-item">
+      {race.algorithms.map(renderAlgorithmData)}
+    </div>
+  );
 };
 
 const Dashboard = () => {
