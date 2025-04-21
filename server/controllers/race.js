@@ -99,7 +99,9 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
           position,
           steps: algorithm.currentStep,
           comparisons: algorithm.comparisons,
-          swaps: algorithm.swaps
+          swaps: algorithm.swaps,
+          arrayAccesses: algorithm.arrayAccesses,
+          arrayWrites: algorithm.arrayWrites
         });
         
         // Check if all algorithms are done
@@ -389,7 +391,9 @@ exports.endRaceEarly = async (io, socket, roomCode) => {
           position: race.finishedAlgorithms.length,
           steps: algorithm.currentStep,
           comparisons: algorithm.comparisons,
-          swaps: algorithm.swaps
+          swaps: algorithm.swaps,
+          arrayAccesses: algorithm.arrayAccesses,
+          arrayWrites: algorithm.arrayWrites
         });
       }
     }

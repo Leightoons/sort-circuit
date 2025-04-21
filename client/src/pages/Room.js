@@ -500,6 +500,14 @@ const Room = () => {
                     <span>Swaps:</span>
                     <span>{data.swaps}</span>
                   </div>
+                  <div className="stat">
+                    <span>Accesses:</span>
+                    <span>{data.arrayAccesses || 0}</span>
+                  </div>
+                  <div className="stat">
+                    <span>Writes:</span>
+                    <span>{data.arrayWrites || 0}</span>
+                  </div>
                   {data.stoppedEarly && (
                     <div className="stopped-early-indicator">
                       ⚠️ Stopped Early
