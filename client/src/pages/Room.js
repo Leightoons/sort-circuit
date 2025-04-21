@@ -73,7 +73,8 @@ const Room = () => {
     selection: false,
     heap: false,
     bogo: false,
-    stalin: false
+    stalin: false,
+    timsort: false
   });
   
   // Add a new state for live speed control
@@ -103,7 +104,8 @@ const Room = () => {
         selection: false,
         heap: false,
         bogo: false,
-        stalin: false
+        stalin: false,
+        timsort: false
       };
       
       algorithms.forEach(algo => {
@@ -551,6 +553,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('merge')}
             />
             <label htmlFor="algo-merge">{getAlgorithmDisplayName('merge')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-timsort"
+              checked={algorithmSelection.timsort}
+              onChange={() => handleAlgorithmChange('timsort')}
+            />
+            <label htmlFor="algo-timsort">{getAlgorithmDisplayName('timsort')}</label>
           </div>
           <div className="algorithm-option">
             <input

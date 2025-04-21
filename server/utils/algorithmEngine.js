@@ -654,6 +654,205 @@ class MergeSort extends SortingAlgorithm {
 }
 
 /**
+ * TimSort
+ * 
+ * A hybrid stable sorting algorithm derived from merge sort and insertion sort.
+ * Used as the default sort in Java, Python, and many other languages.
+ * Works by first dividing the array into small runs and sorting them with insertion sort,
+ * then merges the runs using merge sort's merge algorithm.
+ */
+class TimSort extends SortingAlgorithm {
+  constructor(dataset, stepSpeed) {
+    super(dataset, stepSpeed);
+    this.auxArray = new Array(dataset.length);
+    this.MIN_RUN = 16; // Balance between too small and too large
+  }
+  
+  async sort() {
+    const n = this.dataset.length;
+    
+    // For very small arrays, just use insertion sort directly
+    if (n <= this.MIN_RUN) {
+      await this.insertionSort(0, n - 1);
+      return;
+    }
+    
+    // First pass: Create runs of MIN_RUN length and sort them
+    for (let i = 0; i < n; i += this.MIN_RUN) {
+      const end = Math.min(i + this.MIN_RUN - 1, n - 1);
+      // Sort this run using insertion sort
+      await this.insertionSort(i, end);
+    }
+    
+    // Second pass: Merge runs - standard bottom-up merge approach
+    // Similar to merge sort but starting with larger chunks
+    for (let width = this.MIN_RUN; width < n; width = 2 * width) {
+      for (let i = 0; i < n; i = i + 2 * width) {
+        const mid = Math.min(i + width - 1, n - 1);
+        const right = Math.min(i + 2 * width - 1, n - 1);
+        
+        // Always merge if we have two runs to merge
+        if (mid < right) {
+          await this.mergeRuns(i, mid, right);
+        }
+      }
+    }
+    
+    // Verify the array is sorted
+    let isSorted = true;
+    for (let i = 0; i < n - 1; i++) {
+      if (this.dataset[i] > this.dataset[i + 1]) {
+        isSorted = false;
+        break;
+      }
+    }
+    
+    // If not fully sorted, do a final merge pass
+    if (!isSorted) {
+      await this.mergeSort(0, n - 1);
+    }
+  }
+  
+  // Standard merge sort as a fallback
+  async mergeSort(left, right) {
+    if (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      await this.mergeSort(left, mid);
+      await this.mergeSort(mid + 1, right);
+      await this.mergeRuns(left, mid, right);
+    }
+  }
+  
+  // More efficient insertion sort that minimizes comparisons
+  async insertionSort(left, right) {
+    for (let i = left + 1; i <= right; i++) {
+      // Only store key value if we need to move elements
+      let j = i - 1;
+      
+      // First check if we need to do anything
+      const needsInsert = await this.compare(j, i);
+      
+      if (needsInsert) {
+        const key = this.dataset[i];
+        
+        // If we need to insert, use direct approach
+        while (j >= left && this.dataset[j] > key) {
+          this.dataset[j + 1] = this.dataset[j];
+          
+          // Visualize the shift
+          this.swaps++;
+          this.currentStep++;
+          this.lastOperation = {
+            type: 'swap',
+            indices: [j, j + 1],
+            values: [this.dataset[j], this.dataset[j]]
+          };
+          await sleep(this.stepSpeed);
+          
+          j--;
+        }
+        
+        // Place the key in its correct position
+        this.dataset[j + 1] = key;
+        
+        // Visualize the final insertion
+        this.swaps++;
+        this.currentStep++;
+        this.lastOperation = {
+          type: 'swap',
+          indices: [j + 1, i],
+          values: [this.dataset[j + 1], key]
+        };
+        await sleep(this.stepSpeed);
+      }
+    }
+  }
+  
+  // Standard merge function for reliability
+  async mergeRuns(left, mid, right) {
+    // Copy to auxiliary array
+    for (let i = left; i <= right; i++) {
+      this.auxArray[i] = this.dataset[i];
+    }
+    
+    // Just visualize the copy once
+    this.currentStep++;
+    this.lastOperation = {
+      type: 'copy_to_aux',
+      indices: [left, right],
+      values: [this.dataset[left], this.dataset[right]]
+    };
+    await sleep(this.stepSpeed);
+    
+    let i = left;      // Index for left subarray
+    let j = mid + 1;   // Index for right subarray
+    let k = left;      // Index for merged array
+    
+    // Standard merge process
+    while (i <= mid && j <= right) {
+      // Compare the elements
+      await this.compare(i, j);
+      
+      if (this.auxArray[i] <= this.auxArray[j]) {
+        this.dataset[k] = this.auxArray[i];
+        i++;
+      } else {
+        this.dataset[k] = this.auxArray[j];
+        j++;
+      }
+      
+      // Visualize the placement
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, (k === left + (i - left - 1)) ? i - 1 : j - 1],
+        values: [this.dataset[k], this.auxArray[(k === left + (i - left - 1)) ? i - 1 : j - 1]]
+      };
+      await sleep(this.stepSpeed);
+      
+      k++;
+    }
+    
+    // Copy any remaining elements from left subarray
+    while (i <= mid) {
+      this.dataset[k] = this.auxArray[i];
+      
+      // Visualize the copy
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, i],
+        values: [this.dataset[k], this.auxArray[i]]
+      };
+      await sleep(this.stepSpeed);
+      
+      i++;
+      k++;
+    }
+    
+    // Copy any remaining elements from right subarray
+    while (j <= right) {
+      this.dataset[k] = this.auxArray[j];
+      
+      // Visualize the copy
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, j],
+        values: [this.dataset[k], this.auxArray[j]]
+      };
+      await sleep(this.stepSpeed);
+      
+      j++;
+      k++;
+    }
+  }
+}
+
+/**
  * Bogo Sort
  * 
  * A highly inefficient sorting algorithm that works by repeatedly randomly 
@@ -770,6 +969,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'heap':
       // Heap sort using binary heap data structure
       return new HeapSort(dataset, stepSpeed);
+    case 'timsort':
+      // TimSort - hybrid sorting algorithm
+      return new TimSort(dataset, stepSpeed);
     case 'bogo':
       // Bogo sort - highly inefficient random shuffle sort
       return new BogoSort(dataset, stepSpeed);
