@@ -932,46 +932,35 @@ class PowerSort extends SortingAlgorithm {
       return;
     }
     
-    let i = 0;
-    let remainingLength = n;
+    // Reset stack for this sort operation
+    this.stack = [];
     
-    // Process the input by chunks
-    while (remainingLength > 0) {
+    let i = 0;
+    
+    // Process the input by finding natural runs
+    while (i < n) {
       // Find a natural run or create a MIN_RUN sized run
-      let runLength = await this.findRunLength(i, Math.min(i + this.MIN_RUN, n));
+      let runLength = await this.findRunLength(i, Math.min(i + this.MIN_RUN * 2, n));
+      
+      // Extend run to MIN_RUN if too short
       if (runLength < this.MIN_RUN) {
-        runLength = Math.min(this.MIN_RUN, remainingLength);
-        // Sort this run with insertion sort
+        runLength = Math.min(this.MIN_RUN, n - i);
+        // Sort this short run with insertion sort
         await this.insertionSort(i, i + runLength - 1);
       }
       
       // Push this run onto the stack
       this.pushRun(i, runLength);
       
-      // Use powersort strategy to optimize stack
+      // Merge runs according to PowerSort strategy to maintain balance
       await this.mergeCollapse();
       
       // Move to the next chunk
       i += runLength;
-      remainingLength -= runLength;
     }
     
-    // Merge remaining runs
+    // Merge any remaining runs
     await this.mergeForce();
-    
-    // Verify the array is sorted
-    let isSorted = true;
-    for (let i = 0; i < n - 1; i++) {
-      if (this.dataset[i] > this.dataset[i + 1]) {
-        isSorted = false;
-        break;
-      }
-    }
-    
-    // Safety fallback if needed
-    if (!isSorted) {
-      await this.traditionalMergeSort(0, n - 1);
-    }
   }
   
   // Find the length of a natural run starting at index start
@@ -979,28 +968,34 @@ class PowerSort extends SortingAlgorithm {
     const n = this.dataset.length;
     if (start >= n - 1) return 1;
     
+    // Start with a run of length 2
     let runLength = 2;
     
     // Compare first two elements to determine if run is increasing or decreasing
     await this.compare(start, start + 1);
-    let increasingRun = this.dataset[start] <= this.dataset[start + 1];
+    let increasing = this.dataset[start] <= this.dataset[start + 1];
     
-    // Extend run as far as possible
+    // TimSort optimized natural run detection
     for (let i = start + 2; i < Math.min(maxEnd, n); i++) {
+      // Check if the current element maintains the run order
       await this.compare(i - 1, i);
-      if ((increasingRun && this.dataset[i - 1] <= this.dataset[i]) ||
-          (!increasingRun && this.dataset[i - 1] > this.dataset[i])) {
+      
+      // For increasing runs: current >= previous
+      // For decreasing runs: current < previous
+      if ((increasing && this.dataset[i - 1] <= this.dataset[i]) ||
+          (!increasing && this.dataset[i - 1] > this.dataset[i])) {
         runLength++;
       } else {
-        break;
+        break; // Run ends here
       }
     }
     
-    // If run is decreasing, reverse it
-    if (!increasingRun) {
-      const runEnd = start + runLength - 1;
+    // For descending runs, reverse the elements (like in TimSort)
+    if (!increasing) {
+      // More efficient in-place reversal
       let left = start;
-      let right = runEnd;
+      let right = start + runLength - 1;
+      
       while (left < right) {
         await this.swap(left, right);
         left++;
@@ -1022,93 +1017,104 @@ class PowerSort extends SortingAlgorithm {
   
   // Compute the power used for merge decision
   computePower(n) {
-    let power = 0;
-    while ((1 << power) <= n) {
-      power++;
-    }
-    return power - 1;
+    // Original implementation has inefficient power computation
+    // Let's optimize it for faster determination
+    return Math.floor(Math.log2(n)); // Use Math.log2 for direct power-of-2 calculation
   }
   
   // Merge runs according to PowerSort strategy
   async mergeCollapse() {
     // PowerSort merges based on a power-of-2 strategy
-    while (this.stack.length >= 2) {
+    while (this.stack.length >= 3) {
       const n = this.stack.length;
-      let mergeIdx = n - 2;
+      const X = this.stack[n-3];
+      const Y = this.stack[n-2];
+      const Z = this.stack[n-1];
       
-      // Find proper index for merging
-      for (let i = n - 3; i >= 0; i--) {
-        if (this.stack[i].power < this.stack[i + 1].power + 
-            this.stack[i + 2].power) {
-          mergeIdx = i;
+      // Original PowerSort paper merging criteria - simplified version
+      if (X.length < Y.length + Z.length && Y.length < Z.length) {
+        // Merge Y and X (second-to-last and third-to-last)
+        if (X.length < Z.length) {
+          await this.mergeRuns(X.start, X.start + X.length - 1, Y.start + Y.length - 1);
+          
+          // Update stack - combine X and Y
+          this.stack[n-3] = {
+            start: X.start,
+            length: X.length + Y.length,
+            power: this.computePower(X.length + Y.length)
+          };
+          this.stack.splice(n-2, 1); // Remove Y
+        } else {
+          // Merge Y and Z (second-to-last and last)
+          await this.mergeRuns(Y.start, Y.start + Y.length - 1, Z.start + Z.length - 1);
+          
+          // Update stack - combine Y and Z
+          this.stack[n-2] = {
+            start: Y.start,
+            length: Y.length + Z.length,
+            power: this.computePower(Y.length + Z.length)
+          };
+          this.stack.splice(n-1, 1); // Remove Z
         }
+      } else {
+        break; // Stack is already balanced
       }
+    }
+    
+    // Additional special case for 2 runs
+    if (this.stack.length == 2) {
+      const X = this.stack[0];
+      const Y = this.stack[1];
       
-      // If no violation, we're done
-      if (mergeIdx === n - 2 && 
-          this.stack[n - 2].power >= this.stack[n - 1].power) {
-        break;
-      }
-      
-      // Decide which runs to merge (always merge the smaller into larger)
-      if (mergeIdx + 1 < n - 1 || 
-          this.stack[mergeIdx].length < this.stack[mergeIdx + 2].length) {
-        // Merge at i and i+1
-        const X = this.stack[mergeIdx];
-        const Y = this.stack[mergeIdx + 1];
-        
-        // Merge X and Y
+      // If stack has only 2 runs and they're imbalanced
+      if (X.length < Y.length && X.length < 16) {
         await this.mergeRuns(X.start, X.start + X.length - 1, Y.start + Y.length - 1);
         
-        // Update stack
-        this.stack[mergeIdx] = {
+        // Update stack - combine X and Y
+        this.stack[0] = {
           start: X.start,
           length: X.length + Y.length,
           power: this.computePower(X.length + Y.length)
         };
-        this.stack.splice(mergeIdx + 1, 1);
-      } else {
-        // Merge at i+1 and i+2
-        const Y = this.stack[mergeIdx + 1];
-        const Z = this.stack[mergeIdx + 2];
-        
-        // Merge Y and Z
-        await this.mergeRuns(Y.start, Y.start + Y.length - 1, Z.start + Z.length - 1);
-        
-        // Update stack
-        this.stack[mergeIdx + 1] = {
-          start: Y.start,
-          length: Y.length + Z.length,
-          power: this.computePower(Y.length + Z.length)
-        };
-        this.stack.splice(mergeIdx + 2, 1);
+        this.stack.splice(1, 1); // Remove Y
       }
     }
   }
   
   // Merge all remaining runs
   async mergeForce() {
+    // Keep merging until only one run remains
     while (this.stack.length > 1) {
       const n = this.stack.length;
-      let mergeIdx = n - 2;
       
-      if (mergeIdx > 0 && this.stack[mergeIdx - 1].length < this.stack[mergeIdx + 1].length) {
-        mergeIdx--;
+      // Always merge the two smallest adjacent runs to minimize temporary space
+      // Find the two smallest consecutive runs
+      let minIdx = 0;
+      let minSum = Infinity;
+      
+      for (let i = 0; i < n - 1; i++) {
+        const sum = this.stack[i].length + this.stack[i + 1].length;
+        if (sum < minSum) {
+          minSum = sum;
+          minIdx = i;
+        }
       }
       
-      const X = this.stack[mergeIdx];
-      const Y = this.stack[mergeIdx + 1];
+      // Merge these two runs
+      const X = this.stack[minIdx];
+      const Y = this.stack[minIdx + 1];
       
-      // Merge X and Y
       await this.mergeRuns(X.start, X.start + X.length - 1, Y.start + Y.length - 1);
       
       // Update stack
-      this.stack[mergeIdx] = {
+      this.stack[minIdx] = {
         start: X.start,
         length: X.length + Y.length,
         power: this.computePower(X.length + Y.length)
       };
-      this.stack.splice(mergeIdx + 1, 1);
+      
+      // Remove the merged run
+      this.stack.splice(minIdx + 1, 1);
     }
   }
   
@@ -1246,16 +1252,6 @@ class PowerSort extends SortingAlgorithm {
       
       j++;
       k++;
-    }
-  }
-  
-  // Standard merge sort as fallback
-  async traditionalMergeSort(left, right) {
-    if (left < right) {
-      const mid = Math.floor((left + right) / 2);
-      await this.traditionalMergeSort(left, mid);
-      await this.traditionalMergeSort(mid + 1, right);
-      await this.mergeRuns(left, mid, right);
     }
   }
 }
