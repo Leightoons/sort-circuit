@@ -1353,6 +1353,41 @@ class StalinSort extends SortingAlgorithm {
   }
 }
 
+/**
+ * Gnome Sort
+ * 
+ * A simple comparison-based sorting algorithm that works by repeatedly
+ * swapping adjacent elements if they're in the wrong order, similar to
+ * how a garden gnome sorts flower pots. Also called "Stupid Sort".
+ * It's conceptually simple but not very efficient for large datasets.
+ */
+class GnomeSort extends SortingAlgorithm {
+  async sort() {
+    const n = this.dataset.length;
+    let index = 0;
+    
+    while (index < n) {
+      if (index === 0) {
+        index++;
+      }
+      
+      // Compare current element with the previous one
+      await this.compare(index - 1, index);
+      
+      if (this.dataset[index] >= this.dataset[index - 1]) {
+        // Elements are in correct order, move forward
+        index++;
+      } else {
+        // Elements are in wrong order, swap them and move backward
+        this.arrayAccesses += 2; // Count reads for swap
+        this.arrayWrites += 2;   // Count writes for swap
+        await this.swap(index, index - 1);
+        index--;
+      }
+    }
+  }
+}
+
 // Factory function to create appropriate algorithm instance
 const createAlgorithm = (type, dataset, stepSpeed) => {
   switch (type.toLowerCase()) {
@@ -1385,6 +1420,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'stalin':
       // Stalin sort - joke sorting algorithm
       return new StalinSort(dataset, stepSpeed);
+    case 'gnome':
+      // Gnome sort - simple back and forth sorting algorithm
+      return new GnomeSort(dataset, stepSpeed);
     default:
       throw new Error(`Unknown algorithm type: ${type}`);
   }

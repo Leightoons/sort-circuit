@@ -10,7 +10,8 @@ export const ALGORITHM_ORDER = {
   'powersort': 8,
   'quick': 9,
   'bogo': 10,
-  'stalin': 11
+  'stalin': 11,
+  'gnome': 12
 };
 
 // Define proper display names for each algorithm
@@ -25,7 +26,8 @@ export const ALGORITHM_NAMES = {
   'quick': 'Quick Sort',
   'heap': 'Heap Sort',
   'bogo': 'Bogo Sort',
-  'stalin': 'Stalin Sort'
+  'stalin': 'Stalin Sort',
+  'gnome': 'Gnome Sort'
 };
 
 // Helper function to get the display name for an algorithm

@@ -75,7 +75,8 @@ const Room = () => {
     bogo: false,
     stalin: false,
     timsort: false,
-    powersort: false
+    powersort: false,
+    gnome: false
   });
   
   // Add a new state for live speed control
@@ -107,7 +108,8 @@ const Room = () => {
         bogo: false,
         stalin: false,
         timsort: false,
-        powersort: false
+        powersort: false,
+        gnome: false
       };
       
       algorithms.forEach(algo => {
@@ -632,6 +634,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('stalin')}
             />
             <label htmlFor="algo-stalin">{getAlgorithmDisplayName('stalin')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-gnome"
+              checked={algorithmSelection.gnome}
+              onChange={() => handleAlgorithmChange('gnome')}
+            />
+            <label htmlFor="algo-gnome">{getAlgorithmDisplayName('gnome')}</label>
           </div>
         </div>
         <div className="settings-notice">
