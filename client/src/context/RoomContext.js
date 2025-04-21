@@ -40,7 +40,7 @@ export const RoomProvider = ({ children }) => {
   const [settings, setSettings] = useState({
     datasetSize: 20,
     allowDuplicates: false,
-    valueRange: { min: 1, max: 100 },
+    valueRange: { min: 1, max: 1000 },
     stepSpeed: 250
   });
   const [roomStatus, setRoomStatus] = useState('waiting'); // waiting, racing, finished

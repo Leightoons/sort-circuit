@@ -74,7 +74,8 @@ const Room = () => {
     heap: false,
     bogo: false,
     stalin: false,
-    timsort: false
+    timsort: false,
+    powersort: false
   });
   
   // Add a new state for live speed control
@@ -105,7 +106,8 @@ const Room = () => {
         heap: false,
         bogo: false,
         stalin: false,
-        timsort: false
+        timsort: false,
+        powersort: false
       };
       
       algorithms.forEach(algo => {
@@ -362,7 +364,7 @@ const Room = () => {
                   backgroundColor
                 }}
               >
-                {visualizationDataset.length <= 20 && value}
+                {visualizationDataset.length <= 15 && value}
               </div>
             );
           })}
@@ -566,6 +568,15 @@ const Room = () => {
           <div className="algorithm-option">
             <input
               type="checkbox"
+              id="algo-powersort"
+              checked={algorithmSelection.powersort}
+              onChange={() => handleAlgorithmChange('powersort')}
+            />
+            <label htmlFor="algo-powersort">{getAlgorithmDisplayName('powersort')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
               id="algo-insertion"
               checked={algorithmSelection.insertion}
               onChange={() => handleAlgorithmChange('insertion')}
@@ -634,7 +645,8 @@ const Room = () => {
               id="datasetSize"
               name="datasetSize"
               min="5"
-              max="100"
+              max="500"
+              step="5"
               value={settingsForm.datasetSize}
               onChange={handleSettingsChange}
             />
@@ -674,7 +686,7 @@ const Room = () => {
                   id="valueRange.max"
                   name="valueRange.max"
                   min="1"
-                  max="999"
+                  max="1000"
                   value={settingsForm.valueRange.max}
                   onChange={handleSettingsChange}
                 />

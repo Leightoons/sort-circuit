@@ -434,7 +434,7 @@ p {
 
 .room-main {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 3fr 1fr;
   gap: 1.5rem;
 }
 
@@ -445,12 +445,14 @@ p {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   max-height: 85vh;
   overflow-y: auto;
+  width: 100%;
 }
 
 .algorithms-container {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%;
 }
 
 .algorithm-card {
@@ -458,7 +460,7 @@ p {
 }
 
 .algorithm-visualization {
-  height: 200px;
+  height: 250px;
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 0.75rem;
@@ -506,21 +508,22 @@ p {
   flex: 1;
   display: flex;
   align-items: flex-end;
-  gap: 1px;
+  gap: 0px;
 }
 
 .data-block {
   background-color: var(--color-primary);
-  margin: 0 1px;
+  margin: 0;
   flex: 1;
   position: relative;
   color: white;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  font-size: 0.8rem;
-  border-radius: 1px 1px 0 0;
+  font-size: 0.6rem;
+  border-radius: 0;
   transition: none;
+  min-width: 1px;
 }
 
 .room-sidebar {
@@ -974,4 +977,12 @@ p {
 /* Shuffle animation for bogo sort */
 .algorithm-visualization.last-updated[data-algorithm="bogo"] .data-block {
   animation: shuffle-animation 0.5s ease-in-out;
+}
+
+/* Adjust the race container to be wider on larger screens */
+@media (min-width: 1200px) {
+  .race-container {
+    max-width: 100%;
+    padding: 1.5rem;
+  }
 }

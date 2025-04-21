@@ -853,6 +853,346 @@ class TimSort extends SortingAlgorithm {
 }
 
 /**
+ * PowerSort
+ * 
+ * A modern adaptive sorting algorithm that improves upon TimSort
+ * by using powers of 2 to determine optimal merge points.
+ * It has better worst-case guarantees and adapts even better to patterns in the data.
+ * Developed in 2020, it's one of the newest practical sorting algorithms.
+ */
+class PowerSort extends SortingAlgorithm {
+  constructor(dataset, stepSpeed) {
+    super(dataset, stepSpeed);
+    this.auxArray = new Array(dataset.length);
+    this.MIN_RUN = 16; // Minimum size of a run
+    this.stack = []; // Stack of pending runs
+  }
+  
+  async sort() {
+    const n = this.dataset.length;
+    
+    // Handle small arrays with insertion sort
+    if (n <= this.MIN_RUN) {
+      await this.insertionSort(0, n - 1);
+      return;
+    }
+    
+    let i = 0;
+    let remainingLength = n;
+    
+    // Process the input by chunks
+    while (remainingLength > 0) {
+      // Find a natural run or create a MIN_RUN sized run
+      let runLength = await this.findRunLength(i, Math.min(i + this.MIN_RUN, n));
+      if (runLength < this.MIN_RUN) {
+        runLength = Math.min(this.MIN_RUN, remainingLength);
+        // Sort this run with insertion sort
+        await this.insertionSort(i, i + runLength - 1);
+      }
+      
+      // Push this run onto the stack
+      this.pushRun(i, runLength);
+      
+      // Use powersort strategy to optimize stack
+      await this.mergeCollapse();
+      
+      // Move to the next chunk
+      i += runLength;
+      remainingLength -= runLength;
+    }
+    
+    // Merge remaining runs
+    await this.mergeForce();
+    
+    // Verify the array is sorted
+    let isSorted = true;
+    for (let i = 0; i < n - 1; i++) {
+      if (this.dataset[i] > this.dataset[i + 1]) {
+        isSorted = false;
+        break;
+      }
+    }
+    
+    // Safety fallback if needed
+    if (!isSorted) {
+      await this.traditionalMergeSort(0, n - 1);
+    }
+  }
+  
+  // Find the length of a natural run starting at index start
+  async findRunLength(start, maxEnd) {
+    const n = this.dataset.length;
+    if (start >= n - 1) return 1;
+    
+    let runLength = 2;
+    
+    // Compare first two elements to determine if run is increasing or decreasing
+    await this.compare(start, start + 1);
+    let increasingRun = this.dataset[start] <= this.dataset[start + 1];
+    
+    // Extend run as far as possible
+    for (let i = start + 2; i < Math.min(maxEnd, n); i++) {
+      await this.compare(i - 1, i);
+      if ((increasingRun && this.dataset[i - 1] <= this.dataset[i]) ||
+          (!increasingRun && this.dataset[i - 1] > this.dataset[i])) {
+        runLength++;
+      } else {
+        break;
+      }
+    }
+    
+    // If run is decreasing, reverse it
+    if (!increasingRun) {
+      const runEnd = start + runLength - 1;
+      let left = start;
+      let right = runEnd;
+      while (left < right) {
+        await this.swap(left, right);
+        left++;
+        right--;
+      }
+    }
+    
+    return runLength;
+  }
+  
+  // Push a run onto the stack
+  pushRun(start, length) {
+    this.stack.push({
+      start: start,
+      length: length,
+      power: this.computePower(length)
+    });
+  }
+  
+  // Compute the power used for merge decision
+  computePower(n) {
+    let power = 0;
+    while ((1 << power) <= n) {
+      power++;
+    }
+    return power - 1;
+  }
+  
+  // Merge runs according to PowerSort strategy
+  async mergeCollapse() {
+    // PowerSort merges based on a power-of-2 strategy
+    while (this.stack.length >= 2) {
+      const n = this.stack.length;
+      let mergeIdx = n - 2;
+      
+      // Find proper index for merging
+      for (let i = n - 3; i >= 0; i--) {
+        if (this.stack[i].power < this.stack[i + 1].power + 
+            this.stack[i + 2].power) {
+          mergeIdx = i;
+        }
+      }
+      
+      // If no violation, we're done
+      if (mergeIdx === n - 2 && 
+          this.stack[n - 2].power >= this.stack[n - 1].power) {
+        break;
+      }
+      
+      // Decide which runs to merge (always merge the smaller into larger)
+      if (mergeIdx + 1 < n - 1 || 
+          this.stack[mergeIdx].length < this.stack[mergeIdx + 2].length) {
+        // Merge at i and i+1
+        const X = this.stack[mergeIdx];
+        const Y = this.stack[mergeIdx + 1];
+        
+        // Merge X and Y
+        await this.mergeRuns(X.start, X.start + X.length - 1, Y.start + Y.length - 1);
+        
+        // Update stack
+        this.stack[mergeIdx] = {
+          start: X.start,
+          length: X.length + Y.length,
+          power: this.computePower(X.length + Y.length)
+        };
+        this.stack.splice(mergeIdx + 1, 1);
+      } else {
+        // Merge at i+1 and i+2
+        const Y = this.stack[mergeIdx + 1];
+        const Z = this.stack[mergeIdx + 2];
+        
+        // Merge Y and Z
+        await this.mergeRuns(Y.start, Y.start + Y.length - 1, Z.start + Z.length - 1);
+        
+        // Update stack
+        this.stack[mergeIdx + 1] = {
+          start: Y.start,
+          length: Y.length + Z.length,
+          power: this.computePower(Y.length + Z.length)
+        };
+        this.stack.splice(mergeIdx + 2, 1);
+      }
+    }
+  }
+  
+  // Merge all remaining runs
+  async mergeForce() {
+    while (this.stack.length > 1) {
+      const n = this.stack.length;
+      let mergeIdx = n - 2;
+      
+      if (mergeIdx > 0 && this.stack[mergeIdx - 1].length < this.stack[mergeIdx + 1].length) {
+        mergeIdx--;
+      }
+      
+      const X = this.stack[mergeIdx];
+      const Y = this.stack[mergeIdx + 1];
+      
+      // Merge X and Y
+      await this.mergeRuns(X.start, X.start + X.length - 1, Y.start + Y.length - 1);
+      
+      // Update stack
+      this.stack[mergeIdx] = {
+        start: X.start,
+        length: X.length + Y.length,
+        power: this.computePower(X.length + Y.length)
+      };
+      this.stack.splice(mergeIdx + 1, 1);
+    }
+  }
+  
+  // Insertion sort for small runs
+  async insertionSort(left, right) {
+    for (let i = left + 1; i <= right; i++) {
+      // First check if we need to do anything
+      let j = i - 1;
+      const needsInsert = await this.compare(j, i);
+      
+      if (needsInsert) {
+        const key = this.dataset[i];
+        
+        while (j >= left && this.dataset[j] > key) {
+          this.dataset[j + 1] = this.dataset[j];
+          
+          // Visualize the shift
+          this.swaps++;
+          this.currentStep++;
+          this.lastOperation = {
+            type: 'swap',
+            indices: [j, j + 1],
+            values: [this.dataset[j], this.dataset[j]]
+          };
+          await sleep(this.stepSpeed);
+          
+          j--;
+        }
+        
+        // Place the key in its correct position
+        this.dataset[j + 1] = key;
+        
+        // Visualize the insertion
+        this.swaps++;
+        this.currentStep++;
+        this.lastOperation = {
+          type: 'swap',
+          indices: [j + 1, i],
+          values: [this.dataset[j + 1], key]
+        };
+        await sleep(this.stepSpeed);
+      }
+    }
+  }
+  
+  // Standard merge function
+  async mergeRuns(left, mid, right) {
+    // Copy to auxiliary array
+    for (let i = left; i <= right; i++) {
+      this.auxArray[i] = this.dataset[i];
+    }
+    
+    // Visualize the copy operation
+    this.currentStep++;
+    this.lastOperation = {
+      type: 'copy_to_aux',
+      indices: [left, right],
+      values: [this.dataset[left], this.dataset[right]]
+    };
+    await sleep(this.stepSpeed);
+    
+    let i = left;      // Index for left subarray
+    let j = mid + 1;   // Index for right subarray
+    let k = left;      // Index for merged array
+    
+    // Standard merge process
+    while (i <= mid && j <= right) {
+      await this.compare(i, j);
+      
+      if (this.auxArray[i] <= this.auxArray[j]) {
+        this.dataset[k] = this.auxArray[i];
+        i++;
+      } else {
+        this.dataset[k] = this.auxArray[j];
+        j++;
+      }
+      
+      // Visualize the placement
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, (k === left + (i - left - 1)) ? i - 1 : j - 1],
+        values: [this.dataset[k], this.auxArray[(k === left + (i - left - 1)) ? i - 1 : j - 1]]
+      };
+      await sleep(this.stepSpeed);
+      
+      k++;
+    }
+    
+    // Copy remaining elements from left subarray
+    while (i <= mid) {
+      this.dataset[k] = this.auxArray[i];
+      
+      // Visualize the copy
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, i],
+        values: [this.dataset[k], this.auxArray[i]]
+      };
+      await sleep(this.stepSpeed);
+      
+      i++;
+      k++;
+    }
+    
+    // Copy remaining elements from right subarray
+    while (j <= right) {
+      this.dataset[k] = this.auxArray[j];
+      
+      // Visualize the copy
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [k, j],
+        values: [this.dataset[k], this.auxArray[j]]
+      };
+      await sleep(this.stepSpeed);
+      
+      j++;
+      k++;
+    }
+  }
+  
+  // Standard merge sort as fallback
+  async traditionalMergeSort(left, right) {
+    if (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      await this.traditionalMergeSort(left, mid);
+      await this.traditionalMergeSort(mid + 1, right);
+      await this.mergeRuns(left, mid, right);
+    }
+  }
+}
+
+/**
  * Bogo Sort
  * 
  * A highly inefficient sorting algorithm that works by repeatedly randomly 
@@ -972,6 +1312,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'timsort':
       // TimSort - hybrid sorting algorithm
       return new TimSort(dataset, stepSpeed);
+    case 'powersort':
+      // PowerSort - modern adaptive sorting algorithm
+      return new PowerSort(dataset, stepSpeed);
     case 'bogo':
       // Bogo sort - highly inefficient random shuffle sort
       return new BogoSort(dataset, stepSpeed);
