@@ -77,7 +77,8 @@ const Room = () => {
     timsort: false,
     powersort: false,
     gnome: false,
-    radix: false
+    radix: false,
+    radixbit: false
   });
   
   // Add a new state for live speed control
@@ -111,7 +112,8 @@ const Room = () => {
         timsort: false,
         powersort: false,
         gnome: false,
-        radix: false
+        radix: false,
+        radixbit: false
       };
       
       algorithms.forEach(algo => {
@@ -670,6 +672,15 @@ const Room = () => {
               onChange={() => handleAlgorithmChange('radix')}
             />
             <label htmlFor="algo-radix">{getAlgorithmDisplayName('radix')}</label>
+          </div>
+          <div className="algorithm-option">
+            <input
+              type="checkbox"
+              id="algo-radixbit"
+              checked={algorithmSelection.radixbit}
+              onChange={() => handleAlgorithmChange('radixbit')}
+            />
+            <label htmlFor="algo-radixbit">{getAlgorithmDisplayName('radixbit')}</label>
           </div>
         </div>
         <div className="settings-notice">

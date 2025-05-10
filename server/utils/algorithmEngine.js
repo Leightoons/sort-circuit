@@ -1486,6 +1486,105 @@ class RadixSort extends SortingAlgorithm {
   }
 }
 
+/**
+ * RadixSortBit
+ * 
+ * A bit-based implementation of radix sort that processes integers bit by bit
+ * rather than digit by digit. This can be more efficient for certain inputs,
+ * especially when dealing with binary data or when the range of values is large.
+ */
+class RadixSortBit extends SortingAlgorithm {
+  async sort() {
+    const n = this.dataset.length;
+    if (n <= 1) return;
+    
+    // Find the maximum number to know number of bits
+    let max = this.dataset[0];
+    this.arrayAccesses++; // Count reading max
+    
+    for (let i = 1; i < n; i++) {
+      this.arrayAccesses++; // Count reading for max comparison
+      if (this.dataset[i] > max) {
+        max = this.dataset[i];
+      }
+    }
+    
+    // Calculate number of bits needed
+    const bits = Math.floor(Math.log2(max)) + 1;
+    
+    // Process each bit from least significant to most significant
+    for (let bit = 0; bit < bits; bit++) {
+      await this.bitCountingSort(bit);
+    }
+  }
+  
+  // A function to do counting sort according to a specific bit position
+  async bitCountingSort(bitPosition) {
+    const n = this.dataset.length;
+    
+    // Create output array and count array (for binary, only need size 2)
+    const output = new Array(n);
+    const count = [0, 0]; // For bit 0 and bit 1
+    
+    // Store count of occurrences in count[]
+    for (let i = 0; i < n; i++) {
+      this.arrayAccesses++; // Count reading from dataset
+      const bitValue = (this.dataset[i] >> bitPosition) & 1; // Extract the bit at position
+      count[bitValue]++;
+      
+      // Visualize the bucketing operation
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'bucketing',
+        indices: [i],
+        values: [this.dataset[i]]
+      };
+      await sleep(this.stepSpeed);
+    }
+    
+    // Change count[1] to store the actual position of this bit in output[]
+    count[1] += count[0];
+    
+    // Build the output array from right to left to maintain stability
+    for (let i = n - 1; i >= 0; i--) {
+      this.arrayAccesses++; // Count reading from dataset
+      const bitValue = (this.dataset[i] >> bitPosition) & 1; // Extract the bit at position
+      
+      // Calculate output position based on the bit value
+      // If bit is 0, position is count[0] - 1, if bit is 1, position is count[1] - 1
+      const outputIndex = (bitValue === 0) ? --count[0] : --count[1];
+      
+      this.arrayWrites++; // Count writing to output
+      output[outputIndex] = this.dataset[i];
+      
+      // Visualize placing elements in output array
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'place',
+        indices: [i, outputIndex],
+        values: [this.dataset[i], output[outputIndex]]
+      };
+      await sleep(this.stepSpeed);
+    }
+    
+    // Copy the output array to dataset[]
+    for (let i = 0; i < n; i++) {
+      this.arrayWrites++; // Count writing back to dataset
+      this.dataset[i] = output[i];
+      
+      // Visualize copying back
+      this.swaps++;
+      this.currentStep++;
+      this.lastOperation = {
+        type: 'swap',
+        indices: [i],
+        values: [output[i]]
+      };
+      await sleep(this.stepSpeed);
+    }
+  }
+}
+
 // Factory function to create appropriate algorithm instance
 const createAlgorithm = (type, dataset, stepSpeed) => {
   switch (type.toLowerCase()) {
@@ -1524,6 +1623,9 @@ const createAlgorithm = (type, dataset, stepSpeed) => {
     case 'radix':
       // Radix sort - non-comparative integer sorting algorithm
       return new RadixSort(dataset, stepSpeed);
+    case 'radixbit':
+      // Radix sort bit - bit-based implementation of radix sort
+      return new RadixSortBit(dataset, stepSpeed);
     default:
       throw new Error(`Unknown algorithm type: ${type}`);
   }
