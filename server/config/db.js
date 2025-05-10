@@ -65,6 +65,8 @@ class Room {
     this.players = [];
     this.pendingDeletion = false;
     this.deletionTimestamp = null;
+    this.bets = {};        // Store bets by socketId
+    this.playerPoints = {}; // Store points by socketId
     
     // Apply supplied data over defaults
     Object.assign(this, data);
@@ -77,6 +79,84 @@ class Room {
     console.log(`[Room] Created room object with code: ${this.code}`);
   }
   
+  // Bet management methods
+  placeBet(socketId, username, algorithm) {
+    this.bets[socketId] = {
+      socketId,
+      username,
+      algorithm,
+      timestamp: Date.now()
+    };
+    
+    return {
+      socketId, 
+      username,
+      algorithm
+    };
+  }
+  
+  getAllBets() {
+    return Object.values(this.bets);
+  }
+  
+  clearBets() {
+    this.bets = {};
+    console.log(`[Room ${this.code}] Bets cleared`);
+  }
+  
+  // Point management methods
+  addPoint(socketId, username) {
+    if (!this.playerPoints[socketId]) {
+      this.playerPoints[socketId] = {
+        points: 0,
+        username
+      };
+    }
+    
+    this.playerPoints[socketId].points += 1;
+    this.playerPoints[socketId].username = username; // Update username in case it changed
+    
+    console.log(`[Room ${this.code}] Player ${username} (${socketId}) earned a point, now has ${this.playerPoints[socketId].points}`);
+    return this.playerPoints[socketId].points;
+  }
+  
+  getLeaderboard() {
+    const leaderboard = [];
+    const playersWithPoints = new Set(Object.keys(this.playerPoints));
+    
+    // First add all current players
+    for (const player of this.players) {
+      const points = this.playerPoints[player.socketId]?.points || 0;
+      
+      leaderboard.push({
+        socketId: player.socketId,
+        username: player.username,
+        points
+      });
+      
+      playersWithPoints.delete(player.socketId);
+    }
+    
+    // Add any players who have points but aren't in the room anymore
+    for (const socketId of playersWithPoints) {
+      const data = this.playerPoints[socketId];
+      
+      leaderboard.push({
+        socketId,
+        username: data.username || 'Unknown Player',
+        points: data.points
+      });
+    }
+    
+    // Sort by points (descending)
+    return leaderboard.sort((a, b) => b.points - a.points);
+  }
+  
+  resetPoints() {
+    this.playerPoints = {};
+    console.log(`[Room ${this.code}] Points reset`);
+  }
+  
   static async findOne(query) {
     if (!query || !query.code) {
       console.log('[DB] findOne called with invalid query');
@@ -84,18 +164,21 @@ class Room {
     }
     
     const roomCode = query.code.toUpperCase();
-    const room = db.rooms.get(roomCode);
+    const roomData = db.rooms.get(roomCode);
     
-    console.log(`[DB] findOne for room code: ${roomCode}, found: ${room !== null && room !== undefined}`);
-    console.log(`[DB] All rooms: ${JSON.stringify(Array.from(db.rooms.keys()))}`);
+    console.log(`[DB] findOne for room code: ${roomCode}, found: ${roomData !== null && roomData !== undefined}`);
     
-    if (room) {
+    if (roomData) {
       console.log(`[DB] Found room: ${roomCode}`);
+      
+      // Create a new Room instance with the stored data
+      const room = new Room(roomData);
+      return room;
     } else {
       console.log(`[DB] Room not found: ${roomCode}`);
     }
     
-    return room;
+    return null;
   }
 
   static async create(data) {
@@ -128,7 +211,7 @@ class Room {
     const roomCode = this.code.toUpperCase();
     this.code = roomCode;
     
-    // Store in database
+    // Store in database - store the actual instance
     db.rooms.set(roomCode, this);
     
     console.log(`[DB] Saved room: ${roomCode}`);

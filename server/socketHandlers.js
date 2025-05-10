@@ -1,6 +1,6 @@
 const { getModel, generateRoomCode } = require('./config/db');
-const { startRace, getRaceStatus, stopRace, placeBet, updateRaceStepSpeed, endRaceEarly } = require('./controllers/race');
-const { getAllBetsForRoom, clearRoomBets, getLeaderboard, getLeaderboardWithUsernames, resetRoomPoints } = require('./controllers/bets');
+const { startRace, getRaceStatus, stopRace, updateRaceStepSpeed, endRaceEarly } = require('./controllers/race');
+const { getAllBetsForRoom, clearRoomBets, getLeaderboard, getLeaderboardWithUsernames, resetRoomPoints, placeBet } = require('./controllers/bets');
 const { validateRoom, requireHostPermission, validateRoomStatus } = require('./utils/validationUtils');
 const { reassignRoomHost, handleEmptyRoom } = require('./utils/roomUtils');
 
@@ -342,13 +342,15 @@ const registerSocketHandlers = (io) => {
           });
           
           // Send existing bets to the new user
-          const existingBets = getAllBetsForRoom(normalizedRoomCode);
-          for (const bet of existingBets) {
-            socket.emit('bet_placed', {
-              socketId: bet.socketId,
-              username: bet.username,
-              algorithm: bet.algorithm
-            });
+          const existingBets = await getAllBetsForRoom(normalizedRoomCode);
+          if (existingBets && existingBets.length > 0) {
+            for (const bet of existingBets) {
+              socket.emit('bet_placed', {
+                socketId: bet.socketId,
+                username: bet.username,
+                algorithm: bet.algorithm
+              });
+            }
           }
         }
         
@@ -531,13 +533,8 @@ const registerSocketHandlers = (io) => {
     // Handle user betting
     socket.on('place_bet', async ({ roomCode, algorithm }) => {
       try {
-        const Room = getModel('Room');
-        const room = await Room.findOne({ code: roomCode });
-        
-        if (!room) {
-          socket.emit('bet_error', { message: 'Room not found' });
-          return;
-        }
+        const room = await validateRoom(roomCode, socket);
+        if (!room) return;
         
         // Check if algorithm is valid
         if (!room.algorithms.includes(algorithm)) {
@@ -551,11 +548,22 @@ const registerSocketHandlers = (io) => {
           return;
         }
         
+        // Normalize room code
+        const normalizedRoomCode = roomCode.trim().toUpperCase();
+        
+        // Log the bet being placed
+        console.log(`🎲 Bet placed by ${socket.username} (${socket.id}) in room ${normalizedRoomCode} on algorithm ${algorithm}`);
+        
         // Store the bet using the bets controller
-        placeBet(socket.id, socket.username, roomCode, algorithm);
+        const bet = await placeBet(socket.id, socket.username, normalizedRoomCode, algorithm);
+        
+        if (!bet) {
+          socket.emit('bet_error', { message: 'Error placing bet' });
+          return;
+        }
         
         // Broadcast bet to all users in the room
-        io.to(roomCode).emit('bet_placed', {
+        io.to(normalizedRoomCode).emit('bet_placed', {
           socketId: socket.id,
           username: socket.username,
           algorithm
@@ -750,13 +758,10 @@ const registerSocketHandlers = (io) => {
         await room.save();
         
         // Clean up any race data
-        stopRace(roomCode);
-        
-        // Clear all bets for this room
-        clearRoomBets(roomCode);
+        await stopRace(roomCode);
         
         // Reset room points
-        resetRoomPoints(roomCode);
+        await resetRoomPoints(roomCode);
         
         // Broadcast the room state update to all clients in the room
         io.to(roomCode).emit('race_status', {

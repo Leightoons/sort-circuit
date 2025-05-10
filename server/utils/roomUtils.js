@@ -123,7 +123,7 @@ const handleEmptyRoom = async (io, Room, room, stopRace) => {
       await Room.findOneAndDelete({ _id: checkRoom._id });
       
       // Clean up any active races
-      stopRace(room.code);
+      await stopRace(room.code);
     } catch (err) {
       console.error(`Error in delayed room deletion check: ${err.message}`);
     }

@@ -5,17 +5,17 @@ const { getAllBetsForRoom, clearRoomBets, awardPoints, getLeaderboardWithUsernam
 // In-memory store for active races
 const activeRaces = new Map();
 
-// In-memory store for bets
-const bets = new Map();
-
 // @desc    Start a race
 // @access  Server-only
 exports.startRace = async (io, socket, roomCode, room) => {
   try {
+    // Normalize room code for consistency
+    const normalizedRoomCode = roomCode.trim().toUpperCase();
+    
     if (!room) {
       // Find room if not provided
       const Room = getModel('Room');
-      room = await Room.findOne({ code: roomCode });
+      room = await Room.findOne({ code: normalizedRoomCode });
       
       if (!room) {
         socket.emit('race_error', { message: 'Room not found' });
@@ -24,7 +24,7 @@ exports.startRace = async (io, socket, roomCode, room) => {
     }
     
     // Check if race is already running
-    if (activeRaces.has(roomCode)) {
+    if (activeRaces.has(normalizedRoomCode)) {
       socket.emit('race_error', { message: 'Race is already in progress' });
       return;
     }
@@ -35,7 +35,7 @@ exports.startRace = async (io, socket, roomCode, room) => {
       return;
     }
     
-    console.log(`Starting race in room ${roomCode} with algorithms:`, room.algorithms);
+    console.log(`Starting race in room ${normalizedRoomCode} with algorithms:`, room.algorithms);
     
     // Generate dataset
     const dataset = generateDataset(
@@ -51,29 +51,29 @@ exports.startRace = async (io, socket, roomCode, room) => {
       algorithms[algorithmType] = createAlgorithm(algorithmType, dataset, room.stepSpeed);
     }
     
-    // Store race data
-    activeRaces.set(roomCode, {
-      roomCode,
+    // Store race data with normalized room code
+    activeRaces.set(normalizedRoomCode, {
+      roomCode: normalizedRoomCode,
       algorithms,
       dataset,
       startTime: Date.now(),
       stepSpeed: room.stepSpeed,
       finishedAlgorithms: [],
-      bets: getBetsForRoom(roomCode)
+      bets: await getAllBetsForRoom(normalizedRoomCode)
     });
     
     // Broadcast race start to room
-    io.to(roomCode).emit('race_started', {
-      roomCode,
+    io.to(normalizedRoomCode).emit('race_started', {
+      roomCode: normalizedRoomCode,
       algorithms: room.algorithms,
       dataset
     });
     
     // Start all the sorting algorithms asynchronously
-    const race = activeRaces.get(roomCode);
+    const race = activeRaces.get(normalizedRoomCode);
     
     // Start the algorithms and set up regular update broadcasts
-    await runRaceAlgorithms(io, roomCode, race);
+    await runRaceAlgorithms(io, normalizedRoomCode, race);
     
   } catch (error) {
     console.error('Error starting race:', error);
@@ -84,10 +84,13 @@ exports.startRace = async (io, socket, roomCode, room) => {
 // Run all the algorithms and broadcast updates
 const runRaceAlgorithms = async (io, roomCode, race) => {
   try {
+    // Normalize room code for consistency (if not already done)
+    const normalizedRoomCode = roomCode.trim().toUpperCase();
+    
     // Set up a regular interval to broadcast the current state
     const updateInterval = setInterval(() => {
-      broadcastRaceUpdate(io, roomCode, race);
-    }, Math.min(0, race.stepSpeed));
+      broadcastRaceUpdate(io, normalizedRoomCode, race);
+    }, Math.min(100, race.stepSpeed)); // Update regularly, but not more than 10 times per second
     
     // Store the interval reference in the race object so it can be cleared when ending early
     race.updateInterval = updateInterval;
@@ -102,7 +105,7 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
         const position = race.finishedAlgorithms.push(type);
         
         // Notify clients about algorithm completion
-        io.to(roomCode).emit('algorithm_finished', {
+        io.to(normalizedRoomCode).emit('algorithm_finished', {
           type,
           position,
           steps: algorithm.currentStep,
@@ -117,7 +120,7 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
           if (race.updateInterval) {
             clearInterval(race.updateInterval);
           }
-          await finalizeRace(io, roomCode);
+          await finalizeRace(io, normalizedRoomCode);
         }
       } catch (error) {
         console.error(`Error running algorithm ${type}:`, error);
@@ -132,6 +135,9 @@ const runRaceAlgorithms = async (io, roomCode, race) => {
 
 // Broadcast the current state of all algorithms
 const broadcastRaceUpdate = (io, roomCode, race) => {
+  // Normalize room code for consistency
+  const normalizedRoomCode = roomCode.trim().toUpperCase();
+  
   const updates = {};
   
   // Get current state of each algorithm
@@ -140,8 +146,8 @@ const broadcastRaceUpdate = (io, roomCode, race) => {
   }
   
   // Broadcast updates to all clients in the room
-  io.to(roomCode).emit('race_update', {
-    roomCode,
+  io.to(normalizedRoomCode).emit('race_update', {
+    roomCode: normalizedRoomCode,
     updates
   });
 };
@@ -178,16 +184,21 @@ const calculateAlgorithmResult = (algorithm, type, race, stoppedAlgorithms, winn
 // Finalize the race and update scores
 const finalizeRace = async (io, roomCode) => {
   try {
-    const race = activeRaces.get(roomCode);
+    // Normalize room code for consistency
+    const normalizedRoomCode = roomCode.trim().toUpperCase();
+    
+    const race = activeRaces.get(normalizedRoomCode);
     
     if (!race) {
+      console.log(`No active race found for room ${normalizedRoomCode}`);
       return;
     }
     
     // Get room
     const Room = getModel('Room');
-    const room = await Room.findOne({ code: roomCode });
+    const room = await Room.findOne({ code: normalizedRoomCode });
     if (!room) {
+      console.log(`Room ${normalizedRoomCode} not found in database`);
       return;
     }
     
@@ -202,26 +213,27 @@ const finalizeRace = async (io, roomCode) => {
     const winningBets = [];
     const winningUsers = [];
     
-    for (const [betKey, bet] of bets.entries()) {
-      if (bet.roomCode === roomCode) {
-        if (bet.algorithm === winnerAlgorithm) {
-          winningBets.push(bet);
-          winningUsers.push(bet.socketId);
-        }
+    // Get all bets for this room to award points
+    const allBets = await getAllBetsForRoom(normalizedRoomCode);
+    console.log(`📊 Retrieved ${allBets.length} bets for room ${normalizedRoomCode}`);
+    
+    // Find winning bets
+    for (const bet of allBets) {
+      console.log(`  - Room bet: player=${bet.username}, algorithm=${bet.algorithm}`);
+      if (bet.algorithm === winnerAlgorithm) {
+        winningBets.push(bet);
+        winningUsers.push(bet.socketId);
       }
     }
     
-    // Get all bets for this room to award points
-    const allBets = getAllBetsForRoom(roomCode);
-    
     // Award points to players who bet correctly - returns true if points were awarded
-    const pointsAwarded = awardPoints(roomCode, winnerAlgorithm, allBets);
+    const pointsAwarded = await awardPoints(normalizedRoomCode, winnerAlgorithm, allBets);
     console.log(`Points awarded in race: ${pointsAwarded}`);
     
     // Get the leaderboard with usernames - this will include all players even if they have 0 points
-    const leaderboard = await getLeaderboardWithUsernames(roomCode, allBets);
+    const leaderboard = await getLeaderboardWithUsernames(normalizedRoomCode);
     
-    console.log(`🏁 Room ${roomCode} race finished. Leaderboard (${leaderboard.length} entries):`, leaderboard);
+    console.log(`🏁 Room ${normalizedRoomCode} race finished. Leaderboard (${leaderboard.length} entries):`, leaderboard);
     
     // Keep track of the algorithms that were forcibly stopped
     const stoppedAlgorithms = race.stoppedAlgorithms || [];
@@ -235,8 +247,8 @@ const finalizeRace = async (io, roomCode) => {
     }
     
     // Broadcast race results
-    io.to(roomCode).emit('race_results', {
-      roomCode,
+    io.to(normalizedRoomCode).emit('race_results', {
+      roomCode: normalizedRoomCode,
       results,
       winnerAlgorithm,
       winningUsers,
@@ -245,13 +257,13 @@ const finalizeRace = async (io, roomCode) => {
     });
     
     // Also broadcast the updated leaderboard directly to ensure it's received
-    io.to(roomCode).emit('leaderboard_update', {
-      roomCode,
+    io.to(normalizedRoomCode).emit('leaderboard_update', {
+      roomCode: normalizedRoomCode,
       leaderboard: leaderboard
     });
     
     // Clean up
-    cleanupRace(roomCode);
+    await cleanupRace(normalizedRoomCode);
     
   } catch (error) {
     console.error('Error finalizing race:', error);
@@ -262,12 +274,12 @@ const finalizeRace = async (io, roomCode) => {
  * Cleans up a race, removing it from memory and clearing bets
  * @param {string} roomCode - The room code
  */
-const cleanupRace = (roomCode) => {
+const cleanupRace = async (roomCode) => {
   // Remove from active races
   activeRaces.delete(roomCode);
   
   // Clear bets for the room
-  clearRoomBets(roomCode);
+  await clearRoomBets(roomCode);
 };
 
 // @desc    Get active race status
@@ -292,7 +304,7 @@ exports.getRaceStatus = (roomCode) => {
 
 // @desc    Stop a race (for cleanup)
 // @access  Server-only
-exports.stopRace = (roomCode) => {
+exports.stopRace = async (roomCode) => {
   const race = activeRaces.get(roomCode);
   
   if (race) {
@@ -304,42 +316,8 @@ exports.stopRace = (roomCode) => {
     }
     
     // Clean up race resources
-    cleanupRace(roomCode);
+    await cleanupRace(roomCode);
   }
-};
-
-// @desc    Place a bet
-// @access  Server-only
-exports.placeBet = (socketId, username, roomCode, algorithm) => {
-  const betKey = `${roomCode}:${socketId}`;
-  
-  bets.set(betKey, {
-    socketId,
-    username,
-    roomCode,
-    algorithm,
-    timestamp: Date.now()
-  });
-  
-  return {
-    socketId,
-    username,
-    algorithm
-  };
-};
-
-// @desc    Get all bets for a room
-// @access  Server-only
-const getBetsForRoom = (roomCode) => {
-  const roomBets = [];
-  
-  for (const [key, bet] of bets.entries()) {
-    if (bet.roomCode === roomCode) {
-      roomBets.push(bet);
-    }
-  }
-  
-  return roomBets;
 };
 
 // @desc    Update step speed during a race
@@ -380,8 +358,11 @@ exports.updateRaceStepSpeed = (io, socket, roomCode, newStepSpeed) => {
 // @access  Server-only
 exports.endRaceEarly = async (io, socket, roomCode) => {
   try {
+    // Normalize room code for consistency
+    const normalizedRoomCode = roomCode.trim().toUpperCase();
+    
     // Get the active race
-    const race = activeRaces.get(roomCode);
+    const race = activeRaces.get(normalizedRoomCode);
     
     if (!race) {
       socket.emit('race_error', { message: 'No active race found' });
@@ -413,7 +394,7 @@ exports.endRaceEarly = async (io, socket, roomCode) => {
         race.stoppedAlgorithms.push(type);
         
         // Notify clients about algorithm being forcibly stopped
-        io.to(roomCode).emit('algorithm_stopped', {
+        io.to(normalizedRoomCode).emit('algorithm_stopped', {
           type,
           position: race.finishedAlgorithms.length,
           steps: algorithm.currentStep,
@@ -431,11 +412,11 @@ exports.endRaceEarly = async (io, socket, roomCode) => {
     }
     
     // Finalize the race
-    await finalizeRace(io, roomCode);
+    await finalizeRace(io, normalizedRoomCode);
     
     // Broadcast that the race was ended early
-    io.to(roomCode).emit('race_ended_early', {
-      roomCode,
+    io.to(normalizedRoomCode).emit('race_ended_early', {
+      roomCode: normalizedRoomCode,
       stoppedBy: socket.username || socket.id,
       stoppedAlgorithms: race.stoppedAlgorithms // Use the dedicated stopped algorithms list
     });
@@ -452,8 +433,6 @@ module.exports = {
   startRace: exports.startRace,
   getRaceStatus: exports.getRaceStatus,
   stopRace: exports.stopRace,
-  placeBet: exports.placeBet,
   updateRaceStepSpeed: exports.updateRaceStepSpeed,
-  endRaceEarly: exports.endRaceEarly,
-  getBetsForRoom
+  endRaceEarly: exports.endRaceEarly
 }; 
