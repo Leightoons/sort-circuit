@@ -59,7 +59,7 @@ class Room {
     this.status = 'waiting';
     this.datasetSize = 20;
     this.allowDuplicates = false;
-    this.valueRange = { min: 1, max: 1000 };
+    this.valueRange = { min: 1, max: 5000 };
     this.stepSpeed = 250;
     this.createdAt = new Date();
     this.players = [];

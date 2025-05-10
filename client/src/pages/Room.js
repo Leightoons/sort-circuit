@@ -61,7 +61,7 @@ const Room = () => {
   const [settingsForm, setSettingsForm] = useState({
     datasetSize: 20,
     allowDuplicates: false,
-    valueRange: { min: 1, max: 100 },
+    valueRange: { min: 1, max: 5000 },
     stepSpeed: 250
   });
   
@@ -710,7 +710,7 @@ const Room = () => {
               id="datasetSize"
               name="datasetSize"
               min="5"
-              max="500"
+              max="1000"
               step="5"
               value={settingsForm.datasetSize}
               onChange={handleSettingsChange}
@@ -751,7 +751,7 @@ const Room = () => {
                   id="valueRange.max"
                   name="valueRange.max"
                   min="1"
-                  max="1000"
+                  max="5000"
                   value={settingsForm.valueRange.max}
                   onChange={handleSettingsChange}
                 />

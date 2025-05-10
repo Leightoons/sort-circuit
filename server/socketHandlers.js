@@ -376,14 +376,14 @@ const registerSocketHandlers = (io) => {
           // Send existing bets to the new user
           const existingBets = await getAllBetsForRoom(normalizedRoomCode);
           if (existingBets && existingBets.length > 0) {
-            for (const bet of existingBets) {
-              socket.emit('bet_placed', {
-                socketId: bet.socketId,
-                username: bet.username,
-                algorithm: bet.algorithm
-              });
-            }
+          for (const bet of existingBets) {
+            socket.emit('bet_placed', {
+              socketId: bet.socketId,
+              username: bet.username,
+              algorithm: bet.algorithm
+            });
           }
+        }
           
           // Always send the current leaderboard to the new user
           const leaderboard = await getLeaderboardWithUsernames(normalizedRoomCode);
@@ -884,13 +884,13 @@ const registerSocketHandlers = (io) => {
         socket.emit('room_error', { message: 'Server error' });
       }
     });
-    
+              
     // Handle request to refresh leaderboard (from client)
     socket.on('refresh_leaderboard', async ({ roomCode }) => {
       try {
         const room = await validateRoom(roomCode, socket);
         if (!room) return;
-        
+
         console.log(`Client ${socket.username} requested leaderboard refresh for ${roomCode}`);
         
         // Get the latest leaderboard
@@ -914,17 +914,17 @@ const registerSocketHandlers = (io) => {
         socket.emit('room_error', { message: 'Error refreshing leaderboard' });
       }
     });
-    
+                
     // Handle room leave
     socket.on('leave_room', async ({ roomCode }) => {
       try {
         socket.leave(roomCode);
-        
+                
         // Notify other users in the room
         socket.to(roomCode).emit('user_left', {
           socketId: socket.id,
           username: socket.username
-        });
+                });
         
         // If host is leaving, assign new host or close room
         const Room = getModel('Room');
