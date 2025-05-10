@@ -369,16 +369,12 @@ const registerSocketHandlers = (io) => {
     });
     
     // Handle room creation
-    socket.on('create_room', async ({ algorithms = ['bubble', 'quick', 'inplacestable'], username }) => {
+    socket.on('create_room', async ({ username }) => {
       try {
-        console.log(`[CREATE] Attempting to create room with algorithms: ${algorithms} and username: ${username}`);
+        console.log(`[CREATE] Attempting to create room with username: ${username}`);
         
-        // Validate algorithms
-        if (!algorithms || !Array.isArray(algorithms) || algorithms.length < 2) {
-          console.log(`[CREATE] Error: Must select at least 2 algorithms`);
-          socket.emit('room_error', { message: 'Must select at least 2 algorithms' });
-          return;
-        }
+        // Default algorithms to include
+        const defaultAlgorithms = ['bubble', 'quick', 'inplacestable', 'merge', 'insertion'];
         
         // Validate username
         if (!username || !username.trim()) {
@@ -408,7 +404,7 @@ const registerSocketHandlers = (io) => {
         // Ensure code is uppercase
         code = code.toUpperCase();
   
-        // Create room with selected algorithms
+        // Create room with default algorithms
         const Room = getModel('Room');
         console.log(`[CREATE] Creating room with code: ${code}`);
         const room = await Room.create({
@@ -420,7 +416,7 @@ const registerSocketHandlers = (io) => {
             username: trimmedUsername,
             isHost: true
           }],
-          algorithms: algorithms
+          algorithms: defaultAlgorithms
         });
         
         console.log(`[CREATE] Room created successfully with ID: ${room._id}, code: ${code}, host: ${socket.id}`);
@@ -468,7 +464,7 @@ const registerSocketHandlers = (io) => {
         // Send algorithms to client
         socket.emit('algorithms_updated', {
           roomCode: code,
-          algorithms
+          algorithms: defaultAlgorithms
         });
         
         // Send initial settings to client

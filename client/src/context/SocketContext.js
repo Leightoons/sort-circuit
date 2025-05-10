@@ -193,16 +193,22 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
-  // Create a room
-  const createRoom = (algorithms = ['bubble', 'quick', 'inplacestable'], playerName) => {
-    if (socket && connected) {
-      const name = playerName || username;
-      if (name) {
-        setUsernameFn(name);
-        socket.emit('create_room', { algorithms, username: name });
-        // Note: We don't set isHostingRoom here because we wait for the room_created event
-      }
+  // Create a new room
+  const createRoom = (username) => {
+    if (!connected) {
+      console.error('Cannot create room: not connected to server');
+      return;
     }
+    
+    if (!socket) {
+      console.error('Socket not available');
+      return;
+    }
+    
+    // Emit create room event
+    socket.emit('create_room', {
+      username
+    });
   };
 
   // Place a bet

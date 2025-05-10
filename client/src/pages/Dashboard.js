@@ -80,7 +80,6 @@ const RaceHistoryItem = ({ race }) => {
 
 const Dashboard = () => {
   const [roomCode, setRoomCode] = useState('');
-  const [selectedAlgorithms, setSelectedAlgorithms] = useState(['bubble', 'quick', 'inplacestable']);
   const [joinError, setJoinError] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -111,19 +110,6 @@ const Dashboard = () => {
   // Check if socket connected before allowing room operations
   const isReady = connected;
 
-  // Handle algorithm selection
-  const handleAlgorithmChange = (algorithm) => {
-    if (selectedAlgorithms.includes(algorithm)) {
-      // Remove if already selected
-      if (selectedAlgorithms.length > 1) {
-        setSelectedAlgorithms(selectedAlgorithms.filter(algo => algo !== algorithm));
-      }
-    } else {
-      // Add if not selected
-      setSelectedAlgorithms([...selectedAlgorithms, algorithm]);
-    }
-  };
-
   // Create a new room
   const handleCreateRoom = () => {
     if (!isReady) {
@@ -138,7 +124,7 @@ const Dashboard = () => {
     
     setJoinError('');
     setIsCreatingRoom(true);
-    createRoom(selectedAlgorithms, usernameInput);
+    createRoom(usernameInput);
     
     // Reset creating status after timeout (in case of silent failure)
     setTimeout(() => {
@@ -234,146 +220,15 @@ const Dashboard = () => {
         <div className="card">
           <h3>Create a Room</h3>
           
-          <div className="algorithm-selector">
-            <p>Select algorithms for the race (min 2):</p>
-            <div className="algorithm-options">
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="bubble"
-                  name="bubble"
-                  checked={selectedAlgorithms.includes('bubble')}
-                  onChange={() => handleAlgorithmChange('bubble')}
-                />
-                <label htmlFor="bubble">{getAlgorithmDisplayName('bubble')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="quick"
-                  name="quick"
-                  checked={selectedAlgorithms.includes('quick')}
-                  onChange={() => handleAlgorithmChange('quick')}
-                />
-                <label htmlFor="quick">{getAlgorithmDisplayName('quick')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="inplacestable"
-                  name="inplacestable"
-                  checked={selectedAlgorithms.includes('inplacestable')}
-                  onChange={() => handleAlgorithmChange('inplacestable')}
-                />
-                <label htmlFor="inplacestable">{getAlgorithmDisplayName('inplacestable')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="merge"
-                  name="merge"
-                  checked={selectedAlgorithms.includes('merge')}
-                  onChange={() => handleAlgorithmChange('merge')}
-                />
-                <label htmlFor="merge">{getAlgorithmDisplayName('merge')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="timsort"
-                  name="timsort"
-                  checked={selectedAlgorithms.includes('timsort')}
-                  onChange={() => handleAlgorithmChange('timsort')}
-                />
-                <label htmlFor="timsort">{getAlgorithmDisplayName('timsort')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="powersort"
-                  name="powersort"
-                  checked={selectedAlgorithms.includes('powersort')}
-                  onChange={() => handleAlgorithmChange('powersort')}
-                />
-                <label htmlFor="powersort">{getAlgorithmDisplayName('powersort')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="insertion"
-                  name="insertion"
-                  checked={selectedAlgorithms.includes('insertion')}
-                  onChange={() => handleAlgorithmChange('insertion')}
-                />
-                <label htmlFor="insertion">{getAlgorithmDisplayName('insertion')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="selection"
-                  name="selection"
-                  checked={selectedAlgorithms.includes('selection')}
-                  onChange={() => handleAlgorithmChange('selection')}
-                />
-                <label htmlFor="selection">{getAlgorithmDisplayName('selection')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="heap"
-                  name="heap"
-                  checked={selectedAlgorithms.includes('heap')}
-                  onChange={() => handleAlgorithmChange('heap')}
-                />
-                <label htmlFor="heap">{getAlgorithmDisplayName('heap')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="bogo"
-                  name="bogo"
-                  checked={selectedAlgorithms.includes('bogo')}
-                  onChange={() => handleAlgorithmChange('bogo')}
-                />
-                <label htmlFor="bogo">{getAlgorithmDisplayName('bogo')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="stalin"
-                  name="stalin"
-                  checked={selectedAlgorithms.includes('stalin')}
-                  onChange={() => handleAlgorithmChange('stalin')}
-                />
-                <label htmlFor="stalin">{getAlgorithmDisplayName('stalin')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="gnome"
-                  name="gnome"
-                  checked={selectedAlgorithms.includes('gnome')}
-                  onChange={() => handleAlgorithmChange('gnome')}
-                />
-                <label htmlFor="gnome">{getAlgorithmDisplayName('gnome')}</label>
-              </div>
-              <div className="algorithm-option">
-                <input
-                  type="checkbox"
-                  id="radix"
-                  name="radix"
-                  checked={selectedAlgorithms.includes('radix')}
-                  onChange={() => handleAlgorithmChange('radix')}
-                />
-                <label htmlFor="radix">{getAlgorithmDisplayName('radix')}</label>
-              </div>
-            </div>
-          </div>
+          <p className="info-text">
+            Create a room to race sorting algorithms! You'll be able to select which algorithms 
+            to include in the race after joining.
+          </p>
           
           <button
             onClick={handleCreateRoom}
             className="btn btn-primary btn-block"
-            disabled={!isReady || selectedAlgorithms.length < 2 || !usernameInput.trim() || isCreatingRoom}
+            disabled={!isReady || !usernameInput.trim() || isCreatingRoom}
           >
             {isCreatingRoom ? 'Creating...' : 'Create Room'}
           </button>
