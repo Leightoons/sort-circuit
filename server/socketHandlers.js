@@ -760,8 +760,8 @@ const registerSocketHandlers = (io) => {
         // Clean up any race data
         await stopRace(roomCode);
         
-        // Reset room points
-        await resetRoomPoints(roomCode);
+        // DO NOT reset room points - points are always preserved between races
+        console.log(`Preserving points for room ${roomCode} - points always persist between races`);
         
         // Broadcast the room state update to all clients in the room
         io.to(roomCode).emit('race_status', {
@@ -772,7 +772,9 @@ const registerSocketHandlers = (io) => {
         // Send a bet reset signal to all clients
         io.to(roomCode).emit('bets_reset');
         
-        socket.emit('room_state_reset', { roomCode });
+        socket.emit('room_state_reset', { 
+          roomCode
+        });
       } catch (error) {
         console.error('Error resetting room state:', error);
         socket.emit('room_error', { message: 'Server error' });

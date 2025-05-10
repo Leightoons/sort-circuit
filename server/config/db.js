@@ -68,8 +68,24 @@ class Room {
     this.bets = {};        // Store bets by socketId
     this.playerPoints = {}; // Store points by socketId
     
+    // Check if there's existing playerPoints coming in
+    const hasPlayerPoints = data && data.playerPoints && Object.keys(data.playerPoints).length > 0;
+    
     // Apply supplied data over defaults
     Object.assign(this, data);
+    
+    // Ensure playerPoints is properly initialized (not null or undefined)
+    if (!this.playerPoints) {
+      console.log(`[Room] WARNING: playerPoints was nullified during construction, reinitializing`);
+      this.playerPoints = {};
+    }
+    
+    // Ensure we do a deep copy of playerPoints if it existed
+    if (hasPlayerPoints) {
+      console.log(`[Room] Copying ${Object.keys(data.playerPoints).length} playerPoints entries during construction`);
+      // Ensure we do a proper deep copy and not just a reference
+      this.playerPoints = JSON.parse(JSON.stringify(data.playerPoints));
+    }
     
     // Ensure the code is always set and accessible
     if (!this.code) {
@@ -106,18 +122,35 @@ class Room {
   
   // Point management methods
   addPoint(socketId, username) {
-    if (!this.playerPoints[socketId]) {
-      this.playerPoints[socketId] = {
-        points: 0,
-        username
-      };
+    // Ensure playerPoints exists
+    if (!this.playerPoints) {
+      console.log(`[Room ${this.code}] Creating playerPoints object, it didn't exist!`);
+      this.playerPoints = {};
     }
     
-    this.playerPoints[socketId].points += 1;
-    this.playerPoints[socketId].username = username; // Update username in case it changed
+    // Check if player already has points
+    const currentPoints = this.playerPoints[socketId] ? 
+      this.playerPoints[socketId].points : 0;
     
-    console.log(`[Room ${this.code}] Player ${username} (${socketId}) earned a point, now has ${this.playerPoints[socketId].points}`);
-    return this.playerPoints[socketId].points;
+    console.log(`[Room ${this.code}] ${username} (${socketId}) current points: ${currentPoints}`);
+    
+    // Initialize or update player's points
+    if (!this.playerPoints[socketId]) {
+      this.playerPoints[socketId] = {
+        points: 1, // Start with 1 point
+        username: username
+      };
+    } else {
+      // Increment existing points
+      this.playerPoints[socketId].points += 1;
+      // Update username in case it changed
+      this.playerPoints[socketId].username = username;
+    }
+    
+    const newPoints = this.playerPoints[socketId].points;
+    console.log(`[Room ${this.code}] Player ${username} (${socketId}) earned a point, now has ${newPoints} (${currentPoints} -> ${newPoints})`);
+    
+    return newPoints;
   }
   
   getLeaderboard() {
@@ -153,6 +186,8 @@ class Room {
   }
   
   resetPoints() {
+    console.log(`⚠️ WARNING: Resetting points for room ${this.code} - THIS SHOULD ONLY BE DONE IN SPECIAL CIRCUMSTANCES`);
+    console.log(`Points would normally persist between races`);
     this.playerPoints = {};
     console.log(`[Room ${this.code}] Points reset`);
   }
@@ -171,8 +206,19 @@ class Room {
     if (roomData) {
       console.log(`[DB] Found room: ${roomCode}`);
       
+      // IMPORTANT: Check if playerPoints exists before creating instance
+      if (roomData.playerPoints) {
+        console.log(`[DB] Room ${roomCode} has playerPoints:`, JSON.stringify(roomData.playerPoints, null, 2));
+      } else {
+        console.log(`[DB] WARNING: Room ${roomCode} does NOT have playerPoints!`);
+      }
+      
       // Create a new Room instance with the stored data
       const room = new Room(roomData);
+      
+      // Verify playerPoints were correctly copied to the new instance
+      console.log(`[DB] Room ${roomCode} instance created with playerPoints:`, JSON.stringify(room.playerPoints, null, 2));
+      
       return room;
     } else {
       console.log(`[DB] Room not found: ${roomCode}`);
@@ -211,8 +257,27 @@ class Room {
     const roomCode = this.code.toUpperCase();
     this.code = roomCode;
     
+    console.log(`[DB] Saving room ${roomCode}`);
+    
+    // CRITICAL: Check if playerPoints exists before saving
+    if (this.playerPoints) {
+      console.log(`[DB] Room ${roomCode} saving with playerPoints:`, JSON.stringify(this.playerPoints, null, 2));
+    } else {
+      console.log(`[DB] CRITICAL ERROR: Room ${roomCode} has NO playerPoints to save!`);
+      this.playerPoints = {}; // Initialize if missing to prevent errors
+    }
+    
+    // IMPORTANT: Create a DEEP COPY of the entire object before saving
+    // This ensures we don't save a reference that could be changed
+    const roomToSave = JSON.parse(JSON.stringify(this));
+    
     // Store in database - store the actual instance
-    db.rooms.set(roomCode, this);
+    db.rooms.set(roomCode, roomToSave);
+    
+    // Verify the save worked by retrieving it back
+    const savedRoom = db.rooms.get(roomCode);
+    console.log(`[DB] Room ${roomCode} saved and retrieved with playerPoints:`, 
+      JSON.stringify(savedRoom.playerPoints, null, 2));
     
     console.log(`[DB] Saved room: ${roomCode}`);
     return this;

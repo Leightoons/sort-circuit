@@ -96,7 +96,7 @@ const awardPoints = async (roomCode, winnerAlgorithm, playerBets) => {
   // Normalize room code
   const normalizedRoomCode = roomCode.trim().toUpperCase();
   
-  console.log(`🎖️ Awarding points in room ${normalizedRoomCode} for algorithm ${winnerAlgorithm}`, 
+  console.log(`🎖️ POINTS: Awarding points in room ${normalizedRoomCode} for algorithm ${winnerAlgorithm}`, 
     { betsCount: playerBets.length });
   
   try {
@@ -108,6 +108,8 @@ const awardPoints = async (roomCode, winnerAlgorithm, playerBets) => {
       console.error(`Room ${normalizedRoomCode} not found when awarding points`);
       return false;
     }
+    
+    console.log(`🔍 POINTS: ROOM ID ${room._id} | Room points before award:`, JSON.stringify(room.playerPoints, null, 2));
     
     let updatedCount = 0;
     
@@ -122,8 +124,15 @@ const awardPoints = async (roomCode, winnerAlgorithm, playerBets) => {
       }
     }
     
+    // Extra debugging - check the points BEFORE SAVE
+    console.log(`🔍 POINTS: ROOM ID ${room._id} | Room points after award (before save):`, JSON.stringify(room.playerPoints, null, 2));
+    
     // Save the room to persist the points
     await room.save();
+    
+    // Verify the points were saved correctly by fetching the room again
+    const verifyRoom = await Room.findOne({ code: normalizedRoomCode });
+    console.log(`🔍 POINTS: VERIFY ROOM ID ${verifyRoom._id} | Room points after save:`, JSON.stringify(verifyRoom.playerPoints, null, 2));
     
     console.log(`Updated ${updatedCount} player points for room ${normalizedRoomCode}`);
     
@@ -143,7 +152,7 @@ const getLeaderboardWithUsernames = async (roomCode) => {
   // Normalize room code
   const normalizedRoomCode = roomCode.trim().toUpperCase();
   
-  console.log(`📊 Getting leaderboard for room ${normalizedRoomCode}`);
+  console.log(`📊 POINTS: Getting leaderboard for room ${normalizedRoomCode}`);
   
   try {
     // Get the room
@@ -155,10 +164,12 @@ const getLeaderboardWithUsernames = async (roomCode) => {
       return [];
     }
     
+    console.log(`🔍 POINTS: ROOM ID ${room._id} | Room points when getting leaderboard:`, JSON.stringify(room.playerPoints, null, 2));
+    
     // Get leaderboard directly from the room
     const leaderboard = room.getLeaderboard();
     
-    console.log(`📊 Leaderboard for ${normalizedRoomCode}:`, leaderboard);
+    console.log(`📊 POINTS: Leaderboard for ${normalizedRoomCode} (${leaderboard.length} entries):`, leaderboard);
     return leaderboard;
   } catch (error) {
     console.error(`Error getting leaderboard: ${error.message}`);
@@ -167,14 +178,17 @@ const getLeaderboardWithUsernames = async (roomCode) => {
 };
 
 /**
- * Reset points for a room
+ * Reset points for a room - CAUTION: This will erase all player points!
+ * This function should only be used when explicitly needed (e.g., ending a tournament)
+ * and NOT for normal race resets.
  * @param {string} roomCode - The room code
  */
 const resetRoomPoints = async (roomCode) => {
   // Normalize room code
   const normalizedRoomCode = roomCode.trim().toUpperCase();
   
-  console.log(`⚠️ Resetting points for room ${normalizedRoomCode}`);
+  console.log(`⚠️ WARNING: RESETTING ALL POINTS for room ${normalizedRoomCode}`);
+  console.log(`🛑 THIS SHOULD NOT BE CALLED DURING NORMAL OPERATION - Points should persist between races`);
   
   try {
     // Get the room
@@ -186,13 +200,16 @@ const resetRoomPoints = async (roomCode) => {
       return false;
     }
     
+    // Log current points before reset
+    console.log(`Current points that will be ERASED: ${JSON.stringify(room.playerPoints, null, 2)}`);
+    
     // Reset points in the room
     room.resetPoints();
     
     // Save the room to persist changes
     await room.save();
     
-    console.log(`✅ Points reset for room ${normalizedRoomCode}`);
+    console.log(`✅ Points have been reset for room ${normalizedRoomCode}`);
     return true;
   } catch (error) {
     console.error(`Error resetting points: ${error.message}`);
