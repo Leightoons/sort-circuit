@@ -29,6 +29,14 @@ exports.startRace = async (io, socket, roomCode, room) => {
       return;
     }
     
+    // Ensure we have at least 2 algorithms selected
+    if (!room.algorithms || room.algorithms.length < 2) {
+      socket.emit('race_error', { message: 'Must have at least 2 algorithms selected for a race' });
+      return;
+    }
+    
+    console.log(`Starting race in room ${roomCode} with algorithms:`, room.algorithms);
+    
     // Generate dataset
     const dataset = generateDataset(
       room.datasetSize,

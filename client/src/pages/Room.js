@@ -262,15 +262,21 @@ const Room = () => {
     
     // Ensure at least 2 algorithms are selected
     const selectedCount = Object.values(newSelection).filter(v => v).length;
-    if (selectedCount < 2) return;
-    
-    setAlgorithmSelection(newSelection);
+    if (selectedCount < 2) {
+      console.log('At least 2 algorithms must be selected');
+      return;
+    }
     
     // Create array of selected algorithm names
     const selectedAlgos = Object.keys(newSelection).filter(key => newSelection[key]);
     
+    // Don't update local state immediately, wait for server confirmation
+    console.log(`Requesting algorithm selection update: ${selectedAlgos.join(', ')}`);
+    
     // Update algorithms on server
     selectAlgorithms(roomCode, selectedAlgos);
+    
+    // The actual state will be updated when the server sends back the 'algorithms_updated' event
   };
   
   // Render algorithm visualization

@@ -493,25 +493,13 @@ const registerSocketHandlers = (io) => {
     // Handle algorithm selection
     socket.on('select_algorithm', async ({ roomCode, algorithms }) => {
       try {
-        const Room = getModel('Room');
-        const room = await Room.findOne({ code: roomCode });
+        const room = await validateRoom(roomCode, socket);
+        if (!room) return;
         
-        if (!room) {
-          socket.emit('room_error', { message: 'Room not found' });
-          return;
-        }
-        
-        // Check if user is the host
-        if (room.host !== socket.id) {
-          socket.emit('room_error', { message: 'Only host can select algorithms' });
-          return;
-        }
+        if (!requireHostPermission(room, socket, 'Only host can select algorithms')) return;
         
         // Check if room is not racing
-        if (room.status === 'racing') {
-          socket.emit('room_error', { message: 'Cannot change algorithms during a race' });
-          return;
-        }
+        if (!validateRoomStatus(room, 'waiting', socket, 'Cannot change algorithms during a race')) return;
         
         // Validate algorithms (must have at least 2)
         if (!algorithms || !Array.isArray(algorithms) || algorithms.length < 2) {
@@ -520,15 +508,17 @@ const registerSocketHandlers = (io) => {
         }
         
         // Validate algorithm types
-        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'merge', 'insertion', 'selection', 'heap', 'bogo', 'stalin', 'timsort', 'powersort'];
+        const validAlgorithms = ['bubble', 'quick', 'inplacestable', 'merge', 'insertion', 'selection', 'heap', 'bogo', 'stalin', 'timsort', 'powersort', 'gnome', 'radix'];
         if (!algorithms.every(algo => validAlgorithms.includes(algo))) {
           socket.emit('room_error', { message: 'Invalid algorithm selection' });
           return;
         }
         
-        // Update algorithms
-        room.algorithms = algorithms;
+        // Update algorithms - completely replace the list with the new selection
+        room.algorithms = [...algorithms];
         await room.save();
+        
+        console.log(`Room ${roomCode} algorithms updated to:`, algorithms);
         
         // Broadcast update to all users in the room
         io.to(roomCode).emit('algorithms_updated', {
