@@ -1,6 +1,6 @@
 const { getModel, generateRoomCode } = require('./config/db');
 const { startRace, getRaceStatus, stopRace, placeBet, updateRaceStepSpeed, endRaceEarly } = require('./controllers/race');
-const { getAllBetsForRoom, clearRoomBets } = require('./controllers/bets');
+const { getAllBetsForRoom, clearRoomBets, getLeaderboard, getLeaderboardWithUsernames, resetRoomPoints } = require('./controllers/bets');
 const { validateRoom, requireHostPermission, validateRoomStatus } = require('./utils/validationUtils');
 const { reassignRoomHost, handleEmptyRoom } = require('./utils/roomUtils');
 
@@ -661,22 +661,22 @@ const registerSocketHandlers = (io) => {
         
         // Check if user is the host (we'll do this async while getting the room)
         Room.findOne({ code: normalizedRoomCode }).then(room => {
-          if (!room) {
+        if (!room) {
             socket.emit('race_error', { message: 'Room not found' });
-            return;
-          }
-          
-          // Check if user is the host
-          if (room.host !== socket.id) {
+          return;
+        }
+        
+        // Check if user is the host
+        if (room.host !== socket.id) {
             socket.emit('race_error', { message: 'Only host can update race speed' });
-            return;
-          }
-          
+          return;
+        }
+        
           // Check if room is racing
           if (room.status !== 'racing') {
             socket.emit('race_error', { message: 'Room is not currently racing' });
-            return;
-          }
+          return;
+        }
           
           // Update step speed
           updateRaceStepSpeed(io, socket, normalizedRoomCode, stepSpeed);
@@ -755,6 +755,9 @@ const registerSocketHandlers = (io) => {
         // Clear all bets for this room
         clearRoomBets(roomCode);
         
+        // Reset room points
+        resetRoomPoints(roomCode);
+        
         // Broadcast the room state update to all clients in the room
         io.to(roomCode).emit('race_status', {
           status: 'waiting',
@@ -767,6 +770,34 @@ const registerSocketHandlers = (io) => {
         socket.emit('room_state_reset', { roomCode });
       } catch (error) {
         console.error('Error resetting room state:', error);
+        socket.emit('room_error', { message: 'Server error' });
+      }
+    });
+    
+    // Handle request for leaderboard
+    socket.on('get_leaderboard', async ({ roomCode }) => {
+      try {
+        const room = await validateRoom(roomCode, socket);
+        if (!room) return;
+        
+        // Get leaderboard data with usernames
+        const leaderboard = await getLeaderboardWithUsernames(roomCode);
+        console.log(`Getting leaderboard for room ${roomCode}:`, leaderboard);
+        
+        // Send leaderboard to the requesting client
+        socket.emit('leaderboard_data', { 
+          roomCode,
+          leaderboard
+        });
+        
+        // Also broadcast to all clients in the room to ensure everyone has latest data
+        io.to(roomCode).emit('leaderboard_update', {
+          roomCode,
+          leaderboard
+        });
+        
+      } catch (error) {
+        console.error('Error getting leaderboard:', error);
         socket.emit('room_error', { message: 'Server error' });
       }
     });

@@ -49,6 +49,7 @@ export const RoomProvider = ({ children }) => {
   const [allBets, setAllBets] = useState([]);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
 
   const { socket, connected, username } = useContext(SocketContext);
 
@@ -381,13 +382,59 @@ export const RoomProvider = ({ children }) => {
       });
     });
 
+    // Add event listener for race speed updates
+    socket.on('race_speed_updated', (data) => {
+      // Handle race speed updates...
+    });
+
+    // Add event listener for leaderboard data
+    socket.on('leaderboard_data', ({ roomCode, leaderboard: leaderboardData }) => {
+      console.log('💯 Received leaderboard_data event:', { roomCode, leaderboardData });
+      if (roomCode === currentRoom) {
+        if (leaderboardData && Array.isArray(leaderboardData)) {
+          if (leaderboardData.length > 0) {
+            console.log('Setting leaderboard state with data:', leaderboardData);
+            setLeaderboard(leaderboardData);
+          } else {
+            console.warn('Received empty leaderboard array, will keep existing data');
+          }
+        } else {
+          console.warn('Received invalid leaderboard data:', leaderboardData);
+        }
+      }
+    });
+    
+    // Add event listener for direct leaderboard updates after races
+    socket.on('leaderboard_update', ({ roomCode, leaderboard: leaderboardData }) => {
+      console.log('🔄 Received leaderboard_update event:', { roomCode, leaderboardData });
+      if (roomCode === currentRoom) {
+        if (leaderboardData && Array.isArray(leaderboardData)) {
+          if (leaderboardData.length > 0) {
+            console.log('Updating leaderboard state with new data:', leaderboardData);
+            setLeaderboard(leaderboardData);
+          } else {
+            console.warn('Received empty leaderboard array in update, will keep existing data');
+          }
+        } else {
+          console.warn('Received invalid leaderboard update data:', leaderboardData);
+        }
+      }
+    });
+
     // Race results event
-    socket.on('race_results', ({ results: raceResults, winnerAlgorithm, endedEarly }) => {
+    socket.on('race_results', ({ results: raceResults, winnerAlgorithm, endedEarly, leaderboard: leaderboardData }) => {
       // Skip updates during transition periods
       if (socket._ignoreRaceEvents) {
         console.log('Ignoring race results during transition');
         return;
       }
+      
+      console.log('🏆 Received race_results event with:', { 
+        winnerAlgorithm,
+        hasLeaderboard: !!leaderboardData,
+        leaderboardData: leaderboardData || 'none',
+        endedEarly
+      });
       
       setRoomStatus('finished');
       setResults({
@@ -395,6 +442,14 @@ export const RoomProvider = ({ children }) => {
         results: raceResults,
         endedEarly: endedEarly || false
       });
+
+      // Update leaderboard if provided
+      if (leaderboardData) {
+        console.log('Received leaderboard data from race results:', leaderboardData);
+        setLeaderboard(leaderboardData);
+      } else {
+        console.log('No leaderboard data received in race results');
+      }
       
       // If the race was ended early, we need to completely clear the race data
       // to prevent visualization jitter in the next race
@@ -479,6 +534,10 @@ export const RoomProvider = ({ children }) => {
       setRoomStatus('waiting');
       setResults(null);
       
+      // Reset leaderboard when room state is reset by host
+      console.log('Resetting leaderboard on room state reset');
+      setLeaderboard([]);
+      
       // Fully reset race data to prevent visualization issues in the next race
       setRaceData(null);
     });
@@ -525,6 +584,9 @@ export const RoomProvider = ({ children }) => {
         socket.off('bets_reset');
         socket.off('room_state_reset');
         socket.off('reset_room_state');
+        socket.off('race_speed_updated');
+        socket.off('leaderboard_data');
+        socket.off('leaderboard_update');
       }
     };
   }, [socket, connected]);
@@ -601,7 +663,8 @@ export const RoomProvider = ({ children }) => {
         error,
         currentUsername: username,
         clearError,
-        leaveCurrentRoom
+        leaveCurrentRoom,
+        leaderboard
       }}
     >
       {children}

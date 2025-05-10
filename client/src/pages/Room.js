@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
 import Notifications from '../components/layout/Notifications';
+import Leaderboard from '../components/Leaderboard';
 import { ALGORITHM_ORDER, ALGORITHM_NAMES, getAlgorithmDisplayName } from '../constants/algorithms';
+import '../styles/leaderboard.css';
 
 // Define the preferred algorithm display order
 // const ALGORITHM_ORDER = {
@@ -941,6 +943,7 @@ const Room = () => {
           {renderAlgorithmSelector()}
           {renderSettings()}
           {roomStatus === 'finished' && renderResults()}
+          <Leaderboard roomCode={roomCode} />
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 const { getModel } = require('../config/db');
 const { createAlgorithm, generateDataset } = require('../utils/algorithmEngine');
-const { getAllBetsForRoom, clearRoomBets } = require('./bets');
+const { getAllBetsForRoom, clearRoomBets, awardPoints, getLeaderboardWithUsernames } = require('./bets');
 
 // In-memory store for active races
 const activeRaces = new Map();
@@ -211,6 +211,18 @@ const finalizeRace = async (io, roomCode) => {
       }
     }
     
+    // Get all bets for this room to award points
+    const allBets = getAllBetsForRoom(roomCode);
+    
+    // Award points to players who bet correctly - returns true if points were awarded
+    const pointsAwarded = awardPoints(roomCode, winnerAlgorithm, allBets);
+    console.log(`Points awarded in race: ${pointsAwarded}`);
+    
+    // Get the leaderboard with usernames - this will include all players even if they have 0 points
+    const leaderboard = await getLeaderboardWithUsernames(roomCode, allBets);
+    
+    console.log(`🏁 Room ${roomCode} race finished. Leaderboard (${leaderboard.length} entries):`, leaderboard);
+    
     // Keep track of the algorithms that were forcibly stopped
     const stoppedAlgorithms = race.stoppedAlgorithms || [];
     
@@ -228,7 +240,14 @@ const finalizeRace = async (io, roomCode) => {
       results,
       winnerAlgorithm,
       winningUsers,
-      endedEarly: race.endedEarly || false
+      endedEarly: race.endedEarly || false,
+      leaderboard: leaderboard
+    });
+    
+    // Also broadcast the updated leaderboard directly to ensure it's received
+    io.to(roomCode).emit('leaderboard_update', {
+      roomCode,
+      leaderboard: leaderboard
     });
     
     // Clean up

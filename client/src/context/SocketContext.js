@@ -253,6 +253,16 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
+  // Get leaderboard for a room
+  const getLeaderboard = (roomCode) => {
+    if (socket && connected) {
+      console.log(`Emitting get_leaderboard for room ${roomCode}`);
+      socket.emit('get_leaderboard', { roomCode });
+    } else {
+      console.log('Cannot get leaderboard: socket not connected');
+    }
+  };
+
   // Leave a room
   const leaveRoom = (roomCode) => {
     if (socket && connected) {
@@ -281,6 +291,7 @@ export const SocketProvider = ({ children }) => {
         selectAlgorithms,
         resetRoomState,
         endRaceEarly,
+        getLeaderboard,
         leaveRoom,
         leaveCurrentRoom
       }}
