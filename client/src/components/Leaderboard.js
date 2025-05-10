@@ -1,12 +1,25 @@
-import React, { useEffect, useContext, useState } from 'react';
+import React, { useEffect, useContext, useState, useCallback } from 'react';
 import SocketContext from '../context/SocketContext';
 import RoomContext from '../context/RoomContext';
-import { FaTrophy, FaMedal } from 'react-icons/fa';
+import { FaTrophy, FaMedal, FaSync } from 'react-icons/fa';
 
 const Leaderboard = ({ roomCode }) => {
   const { getLeaderboard, socket } = useContext(SocketContext);
   const { leaderboard, currentUsername, roomStatus } = useContext(RoomContext);
   const [hasRequestedLeaderboard, setHasRequestedLeaderboard] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Create a refreshLeaderboard function that can be called directly
+  const refreshLeaderboard = useCallback(() => {
+    if (roomCode) {
+      console.log('🔄 Manually refreshing leaderboard for room:', roomCode);
+      setIsRefreshing(true);
+      getLeaderboard(roomCode);
+      
+      // Reset the refreshing state after a short delay
+      setTimeout(() => setIsRefreshing(false), 1000);
+    }
+  }, [roomCode, getLeaderboard]);
 
   // Log leaderboard on render for debugging
   console.log('👑 Rendering Leaderboard component:', { 
@@ -37,15 +50,31 @@ const Leaderboard = ({ roomCode }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomCode, roomStatus]);
 
-  // Force update after 2 seconds
+  // Force update after display or visibility changes
   useEffect(() => {
-    const forceUpdateTimer = setTimeout(() => {
-      // This will force a re-render
-      setHasRequestedLeaderboard(prev => !prev);
-    }, 2000);
+    // Refresh data when component becomes visible
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible' && roomCode) {
+        console.log('🔍 Document became visible, refreshing leaderboard');
+        getLeaderboard(roomCode);
+      }
+    }
 
-    return () => clearTimeout(forceUpdateTimer);
-  }, [roomStatus]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Set up a periodic refresh (every 10 seconds)
+    const periodicRefresh = setInterval(() => {
+      if (roomCode) {
+        console.log('⏱️ Periodic leaderboard refresh');
+        getLeaderboard(roomCode);
+      }
+    }, 10000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(periodicRefresh);
+    };
+  }, [roomCode, getLeaderboard]);
 
   // Force update after roomStatus changes with delays to catch race conditions
   useEffect(() => {
@@ -117,24 +146,23 @@ const Leaderboard = ({ roomCode }) => {
 
   return (
     <div className="leaderboard-card">
-      <h3>Leaderboard {isMockData && "(No Data Yet)"}</h3>
+      <div className="leaderboard-header">
+        <h3>Leaderboard {isMockData && "(No Data Yet)"}</h3>
+        <button 
+          className="refresh-button" 
+          onClick={refreshLeaderboard} 
+          disabled={isRefreshing}
+          title="Refresh leaderboard"
+        >
+          <FaSync className={isRefreshing ? 'spinning' : ''} />
+        </button>
+      </div>
       {isMockData && (
         <p className="no-data">
           {hasRequestedLeaderboard 
             ? "Waiting for leaderboard data..." 
             : "Complete a race to see player rankings"}
         </p>
-      )}
-      {isMockData && (
-        <button 
-          className="debug-button" 
-          onClick={() => {
-            console.log('Manual leaderboard refresh');
-            getLeaderboard(roomCode);
-          }}
-        >
-          Refresh Leaderboard
-        </button>
       )}
       <div className="leaderboard-list">
         {displayLeaderboard.map((player, index) => (

@@ -6,12 +6,19 @@
   margin-bottom: 20px;
 }
 
-.leaderboard-card h3 {
-  color: var(--color-primary);
-  margin-top: 0;
+.leaderboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 8px;
+}
+
+.leaderboard-card h3 {
+  color: var(--color-primary);
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .leaderboard-list {
@@ -119,4 +126,42 @@
 
 .debug-button:hover {
   background-color: #e0e0e0;
+}
+
+.refresh-button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 5px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.refresh-button:hover {
+  color: var(--color-primary);
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: scale(1.1);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-button:active {
+  transform: scale(0.95);
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 } 

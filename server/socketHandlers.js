@@ -120,6 +120,38 @@ const registerSocketHandlers = (io) => {
     }
   }, HEARTBEAT_CHECK_INTERVAL);
   
+  // Setup periodic leaderboard updates
+  // This ensures the leaderboard stays visible on clients between races
+  setInterval(async () => {
+    try {
+      const Room = getModel('Room');
+      const rooms = await Room.find();
+      
+      for (const room of rooms) {
+        // Only send updates to rooms with players
+        if (room.players && room.players.length > 0) {
+          // Get the leaderboard for this room
+          const leaderboard = await getLeaderboardWithUsernames(room.code);
+          
+          // Only send if there's actual data to send
+          if (leaderboard && leaderboard.length > 0) {
+            // Send leaderboard update to all clients in the room
+            io.to(room.code).emit('leaderboard_update', {
+              roomCode: room.code,
+              leaderboard,
+              forceDisplay: true,
+              isPeriodicUpdate: true // Flag to indicate this is an automatic update
+            });
+            
+            console.log(`Sent periodic leaderboard update to room ${room.code} with ${leaderboard.length} entries`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in periodic leaderboard update:', error);
+    }
+  }, 30000); // Every 30 seconds
+  
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id, socket.username);
     
@@ -352,7 +384,23 @@ const registerSocketHandlers = (io) => {
               });
             }
           }
+          
+          // Always send the current leaderboard to the new user
+          const leaderboard = await getLeaderboardWithUsernames(normalizedRoomCode);
+          socket.emit('leaderboard_data', { 
+            roomCode: normalizedRoomCode,
+            leaderboard
+          });
         }
+        
+        // Always broadcast the leaderboard to all room members when someone joins
+        // This ensures everyone's UI is updated with the latest leaderboard
+        const fullLeaderboard = await getLeaderboardWithUsernames(normalizedRoomCode);
+        io.to(normalizedRoomCode).emit('leaderboard_update', { 
+          roomCode: normalizedRoomCode,
+          leaderboard: fullLeaderboard,
+          forceDisplay: true // Signal to client to force displaying the leaderboard
+        });
         
         console.log(`User ${socket.username} (${socket.id}) joined room ${normalizedRoomCode}`);
         
@@ -478,6 +526,13 @@ const registerSocketHandlers = (io) => {
             valueRange: room.valueRange,
             stepSpeed: room.stepSpeed
           }
+        });
+        
+        // Send initial empty leaderboard
+        const emptyLeaderboard = room.getLeaderboard(); // Will create an empty leaderboard with just this player
+        socket.emit('leaderboard_data', {
+          roomCode: code,
+          leaderboard: emptyLeaderboard
         });
         
         console.log(`User ${trimmedUsername} (${socket.id}) created room ${code}`);
@@ -772,9 +827,28 @@ const registerSocketHandlers = (io) => {
         // Send a bet reset signal to all clients
         io.to(roomCode).emit('bets_reset');
         
+        // Get the current leaderboard and send it again to ensure it's displayed
+        const leaderboard = await getLeaderboardWithUsernames(roomCode);
+        io.to(roomCode).emit('leaderboard_update', {
+          roomCode,
+          leaderboard,
+          forceDisplay: true // Signal to client to make sure leaderboard is shown
+        });
+        
         socket.emit('room_state_reset', { 
           roomCode
         });
+        
+        // Schedule another leaderboard update after a short delay
+        // This helps ensure the UI has properly reset and can show the leaderboard
+        setTimeout(async () => {
+          const refreshedLeaderboard = await getLeaderboardWithUsernames(roomCode);
+          io.to(roomCode).emit('leaderboard_update', {
+            roomCode,
+            leaderboard: refreshedLeaderboard,
+            forceDisplay: true
+          });
+        }, 1000); // Send again after 1 second
       } catch (error) {
         console.error('Error resetting room state:', error);
         socket.emit('room_error', { message: 'Server error' });
@@ -794,18 +868,50 @@ const registerSocketHandlers = (io) => {
         // Send leaderboard to the requesting client
         socket.emit('leaderboard_data', { 
           roomCode,
-          leaderboard
+          leaderboard,
+          forceDisplay: true // Tell client to make sure it's displayed
         });
         
         // Also broadcast to all clients in the room to ensure everyone has latest data
         io.to(roomCode).emit('leaderboard_update', {
           roomCode,
-          leaderboard
+          leaderboard,
+          forceDisplay: true // Tell all clients to make sure it's displayed
         });
         
       } catch (error) {
         console.error('Error getting leaderboard:', error);
         socket.emit('room_error', { message: 'Server error' });
+      }
+    });
+    
+    // Handle request to refresh leaderboard (from client)
+    socket.on('refresh_leaderboard', async ({ roomCode }) => {
+      try {
+        const room = await validateRoom(roomCode, socket);
+        if (!room) return;
+        
+        console.log(`Client ${socket.username} requested leaderboard refresh for ${roomCode}`);
+        
+        // Get the latest leaderboard
+        const leaderboard = await getLeaderboardWithUsernames(roomCode);
+        
+        // Send updated leaderboard to all clients
+        io.to(roomCode).emit('leaderboard_update', {
+          roomCode,
+          leaderboard,
+          forceDisplay: true // Ensure it's displayed
+        });
+        
+        // Acknowledge the refresh to the requesting client
+        socket.emit('leaderboard_refreshed', { 
+          success: true,
+          entries: leaderboard.length
+        });
+        
+      } catch (error) {
+        console.error('Error refreshing leaderboard:', error);
+        socket.emit('room_error', { message: 'Error refreshing leaderboard' });
       }
     });
     

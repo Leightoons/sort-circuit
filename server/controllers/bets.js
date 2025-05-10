@@ -145,6 +145,7 @@ const awardPoints = async (roomCode, winnerAlgorithm, playerBets) => {
 
 /**
  * Get the leaderboard for a room with usernames included
+ * This function always returns a usable leaderboard, even between races
  * @param {string} roomCode - The room code
  * @returns {Array} - Array of players with points, sorted by points
  */
@@ -164,12 +165,50 @@ const getLeaderboardWithUsernames = async (roomCode) => {
       return [];
     }
     
-    console.log(`🔍 POINTS: ROOM ID ${room._id} | Room points when getting leaderboard:`, JSON.stringify(room.playerPoints, null, 2));
+    console.log(`🔍 POINTS: ROOM ID ${room._id} | Room players: ${room.players.length}, Points data: ${Object.keys(room.playerPoints || {}).length} entries`);
     
-    // Get leaderboard directly from the room
-    const leaderboard = room.getLeaderboard();
+    // Always build a fresh leaderboard when this function is called
+    // This ensures it's always up to date when displayed
+    console.log(`Building fresh leaderboard for room ${normalizedRoomCode}`);
     
-    console.log(`📊 POINTS: Leaderboard for ${normalizedRoomCode} (${leaderboard.length} entries):`, leaderboard);
+    // Get leaderboard directly from the room's method
+    // The room's getLeaderboard() will handle combining points data with current players
+    let leaderboard = room.getLeaderboard();
+    
+    // If the leaderboard is empty but we have players, build it from scratch
+    if (leaderboard.length === 0 && room.players && room.players.length > 0) {
+      console.log(`Leaderboard was empty but room has ${room.players.length} players - creating entries for all players`);
+      
+      // Create a fresh leaderboard with all players
+      leaderboard = room.players.map(player => ({
+        socketId: player.socketId,
+        username: player.username || 'Unknown Player',
+        points: 0 // Start with 0 points
+      }));
+    }
+    
+    // Always ensure all current room players are included (even with 0 points)
+    // This makes sure players who haven't earned points yet still appear on the leaderboard
+    if (room.players && room.players.length > 0) {
+      // Create a map of existing player entries for quick lookup
+      const existingPlayers = new Map(leaderboard.map(entry => [entry.socketId, entry]));
+      
+      // Add any players missing from the leaderboard
+      for (const player of room.players) {
+        if (!existingPlayers.has(player.socketId)) {
+          leaderboard.push({
+            socketId: player.socketId,
+            username: player.username || 'Unknown Player',
+            points: 0
+          });
+        }
+      }
+      
+      // Re-sort after adding any missing players
+      leaderboard.sort((a, b) => b.points - a.points);
+    }
+    
+    console.log(`📊 POINTS: Leaderboard for ${normalizedRoomCode} (${leaderboard.length} entries)`);
     return leaderboard;
   } catch (error) {
     console.error(`Error getting leaderboard: ${error.message}`);

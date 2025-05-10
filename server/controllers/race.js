@@ -257,10 +257,32 @@ const finalizeRace = async (io, roomCode) => {
     });
     
     // Also broadcast the updated leaderboard directly to ensure it's received
+    // This ensures clients have the latest leaderboard for display between races
     io.to(normalizedRoomCode).emit('leaderboard_update', {
       roomCode: normalizedRoomCode,
-      leaderboard: leaderboard
+      leaderboard: leaderboard,
+      forceDisplay: true // Signal to client to force displaying the leaderboard
     });
+    
+    // Schedule another leaderboard update after a delay
+    // This helps with UI race conditions and ensures the leaderboard stays visible
+    setTimeout(async () => {
+      try {
+        // Get a fresh leaderboard
+        const refreshedLeaderboard = await getLeaderboardWithUsernames(normalizedRoomCode);
+        
+        // Send another update to ensure it's displayed
+        io.to(normalizedRoomCode).emit('leaderboard_update', {
+          roomCode: normalizedRoomCode,
+          leaderboard: refreshedLeaderboard,
+          forceDisplay: true
+        });
+        
+        console.log(`Sent delayed leaderboard update for room ${normalizedRoomCode}`);
+      } catch (error) {
+        console.error(`Error sending delayed leaderboard update: ${error.message}`);
+      }
+    }, 2000); // Send again after 2 seconds
     
     // Clean up
     await cleanupRace(normalizedRoomCode);

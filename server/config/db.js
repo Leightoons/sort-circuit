@@ -155,30 +155,58 @@ class Room {
   
   getLeaderboard() {
     const leaderboard = [];
+    
+    // Ensure playerPoints exists
+    if (!this.playerPoints) {
+      console.log(`[Room ${this.code}] playerPoints is missing, initializing empty object`);
+      this.playerPoints = {};
+    }
+    
+    // Create a set of player IDs who have points
     const playersWithPoints = new Set(Object.keys(this.playerPoints));
     
     // First add all current players
-    for (const player of this.players) {
-      const points = this.playerPoints[player.socketId]?.points || 0;
-      
-      leaderboard.push({
-        socketId: player.socketId,
-        username: player.username,
-        points
-      });
-      
-      playersWithPoints.delete(player.socketId);
+    if (this.players && this.players.length > 0) {
+      for (const player of this.players) {
+        const points = this.playerPoints[player.socketId]?.points || 0;
+        
+        leaderboard.push({
+          socketId: player.socketId,
+          username: player.username || 'Unknown Player',
+          points
+        });
+        
+        // Mark this player as processed
+        playersWithPoints.delete(player.socketId);
+      }
+    } else {
+      console.log(`[Room ${this.code}] No players found when building leaderboard`);
     }
     
     // Add any players who have points but aren't in the room anymore
     for (const socketId of playersWithPoints) {
-      const data = this.playerPoints[socketId];
+      if (this.playerPoints[socketId]) {
+        const data = this.playerPoints[socketId];
+        
+        leaderboard.push({
+          socketId,
+          username: data.username || 'Unknown Player',
+          points: data.points || 0
+        });
+      }
+    }
+    
+    // If leaderboard is still empty but we have playerPoints entries, create entries from them
+    if (leaderboard.length === 0 && Object.keys(this.playerPoints).length > 0) {
+      console.log(`[Room ${this.code}] Building leaderboard from playerPoints`);
       
-      leaderboard.push({
-        socketId,
-        username: data.username || 'Unknown Player',
-        points: data.points
-      });
+      for (const [socketId, data] of Object.entries(this.playerPoints)) {
+        leaderboard.push({
+          socketId,
+          username: data.username || 'Unknown Player',
+          points: data.points || 0
+        });
+      }
     }
     
     // Sort by points (descending)
