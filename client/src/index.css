@@ -139,22 +139,42 @@ p {
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+/* Styling for the combined input slider and number field */
+.input-with-number {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-with-number input[type="range"] {
+  flex: 1;
+  margin-right: 10px;
+}
+
+.input-with-number input[type="number"] {
+  width: 80px;
+  flex-shrink: 0;
+  text-align: center;
 }
 
 /* Alerts */

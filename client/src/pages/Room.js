@@ -705,17 +705,27 @@ const Room = () => {
         <form onSubmit={handleSettingsSubmit}>
           <div className="form-group">
             <label htmlFor="datasetSize">Dataset Size</label>
-            <input
-              type="range"
-              id="datasetSize"
-              name="datasetSize"
-              min="5"
-              max="1000"
-              step="5"
-              value={settingsForm.datasetSize}
-              onChange={handleSettingsChange}
-            />
-            <span>{settingsForm.datasetSize}</span>
+            <div className="input-with-number">
+              <input
+                type="range"
+                id="datasetSize"
+                name="datasetSize"
+                min="5"
+                max="1024"
+                step="1"
+                value={settingsForm.datasetSize}
+                onChange={handleSettingsChange}
+              />
+              <input
+                type="number"
+                id="datasetSizeNumber"
+                name="datasetSize"
+                min="5"
+                max="1024"
+                value={settingsForm.datasetSize}
+                onChange={handleSettingsChange}
+              />
+            </div>
           </div>
           
           <div className="form-group">
@@ -761,17 +771,27 @@ const Room = () => {
           
           <div className="form-group">
             <label htmlFor="stepSpeed">Step Speed (ms)</label>
-            <input
-              type="range"
-              id="stepSpeed"
-              name="stepSpeed"
-              min="0"
-              max="1000"
-              step="50"
-              value={settingsForm.stepSpeed}
-              onChange={handleSettingsChange}
-            />
-            <span>{settingsForm.stepSpeed}</span>
+            <div className="input-with-number">
+              <input
+                type="range"
+                id="stepSpeed"
+                name="stepSpeed"
+                min="0"
+                max="1000"
+                step="10"
+                value={settingsForm.stepSpeed}
+                onChange={handleSettingsChange}
+              />
+              <input
+                type="number"
+                id="stepSpeedNumber"
+                name="stepSpeed"
+                min="0"
+                max="1000"
+                value={settingsForm.stepSpeed}
+                onChange={handleSettingsChange}
+              />
+            </div>
           </div>
           
           <button type="submit" className="btn btn-primary">
@@ -792,17 +812,27 @@ const Room = () => {
         <h3>Host Controls</h3>
         <div className="form-group">
           <label htmlFor="liveSpeed">Algorithm Speed (ms)</label>
-          <input
-            type="range"
-            id="liveSpeed"
-            name="liveSpeed"
-            min="0"
-            max="1000"
-            step="50"
-            value={liveSpeed}
-            onChange={handleLiveSpeedChange}
-          />
-          <span>{liveSpeed}ms</span>
+          <div className="input-with-number">
+            <input
+              type="range"
+              id="liveSpeed"
+              name="liveSpeed"
+              min="0"
+              max="1000"
+              step="10"
+              value={liveSpeed}
+              onChange={handleLiveSpeedChange}
+            />
+            <input
+              type="number"
+              id="liveSpeedNumber"
+              name="liveSpeed"
+              min="0"
+              max="1000"
+              value={liveSpeed}
+              onChange={handleLiveSpeedChange}
+            />
+          </div>
         </div>
         <p className="speed-info">
           <i className="fas fa-info-circle"></i> Changes apply immediately to all algorithms
