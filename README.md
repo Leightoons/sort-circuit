@@ -57,7 +57,7 @@ Each sorting algorithm is implemented with visual steps to show the sorting proc
 - `insertion` - Builds the final sorted array one item at a time by iteratively inserting each element into its correct position in the already sorted portion
 - `selection` - Repeatedly finds the minimum element from the unsorted part and puts it at the beginning
 - `heap` - Builds a binary heap from the array and repeatedly extracts the maximum element to build the sorted array from back to front
-- `inplacestable` - A stable sorting algorithm that operates in-place with O(n log n) time complexity
+- `inplacestable` - A stable sorting algorithm that operates in-place with O(n log n) time complexity (based on an algorithm by Thomas Baudel: <https://thomas.baudel.name/Visualisation/VisuTri/inplacestablesort.html>)
 - `merge` - Divides the array into two halves, sorts them, and then merges the sorted halves
 - `timsort` - A hybrid sorting algorithm derived from merge sort and insertion sort, designed to perform well on many kinds of real-world data
 - `powersort` - An optimization of merge sort that uses a binary search tree to guide the merging process
